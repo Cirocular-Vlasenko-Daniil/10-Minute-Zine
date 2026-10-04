@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- Сценарии скриншотов для itch.io: редактор во фрейме (тот же адрес — можно нажимать его кнопки),
+     ?shot=<имя> выставляет нужное состояние. Снимает tools/itch-shots.sh через Chrome без окна.
+     Только для разработки, на сайт не попадает. -->
+<meta charset="utf-8">
+<title>shots</title>
+<style>html, body { margin: 0; height: 100%; overflow: hidden; } iframe { border: 0; width: 100vw; height: 100vh; display: block; }</style>
+<script>
+  // интерфейс и пример — английские; профиль браузера свежий, поэтому грузится пример
+  try { localStorage.setItem('zine-lang', new URLSearchParams(location.search).get('lang') || 'en'); } catch (e) {}
+</script>
+<iframe id="f" src="/editor.html"></iframe>
+<script>
+const shot = new URLSearchParams(location.search).get('shot') || 'editor';
+const f = document.getElementById('f');
+const W = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (fn, t = 15000) => { const t0 = Date.now(); while (!fn()) { if (Date.now() - t0 > t) throw new Error('timeout'); await W(100); } };
+
+f.onload = async () => {
+  const w = f.contentWindow, d = f.contentDocument, $ = (s) => d.querySelector(s);
+  await until(() => d.querySelector('#canvas .page') && d.querySelectorAll('#nav .thumb').length);
+  await W(800);
+  const page = async (n) => { $(`.thumb[data-page="${n}"]`).dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await W(400); };
+  const pick = async (name, n = 0) => { // выделить блок по подписи на ручке
+    const el = [...d.querySelectorAll('#canvas .blk')].filter((b) => b.querySelector('.grip').textContent.trim() === name)[n];
+    const r = el.getBoundingClientRect(), o = { bubbles: true, clientX: r.left + 10, clientY: r.top + 6, button: 0, pointerId: 1 };
+    el.querySelector('.grip').dispatchEvent(new w.PointerEvent('pointerdown', o));
+    w.dispatchEvent(new w.PointerEvent('pointerup', o));
+    await W(400);
+  };
+  const click = async (sel) => { $(sel).click(); await W(500); };
+  // повторяемая «случайная» палитра
+  const seed = (s) => { w.Math.random = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+
+  switch (shot) {
+    case 'editor': await page(1); await pick('Text', 1); break;
+    case 'sheet': await click('#viewTabs [data-view="sheet"]'); break;
+    case 'image': await page(0); await pick('Image'); break;
+    case 'caption': await page(4); await pick('Image with caption'); break;
+    case 'palette': await page(0); seed(+(new URLSearchParams(location.search).get('seed') || 1)); await click('[data-act="randPalette"]');
+      $('[data-act="randPalette"]').scrollIntoView({ block: 'start' }); break; // показать краски в панели
+    case 'export': await click('#viewTabs [data-view="sheet"]'); [...d.querySelectorAll('button')].find((b) => /PDF/.test(b.textContent)).click(); await W(500);
+      d.querySelector('[data-mode="press"], input[value="press"]')?.click(); await W(300); break;
+    case 'darkposter': { // проверка полосы по краю: пустой постер на тёмной бумаге
+      d.querySelector('#sideTabs [data-side="1"]').click(); await W(500);
+      const inp = d.querySelector('[data-paper-custom]'); inp.value = '#1a2a4a';
+      inp.dispatchEvent(new w.Event('input', { bubbles: true })); inp.dispatchEvent(new w.Event('change', { bubbles: true })); await W(400);
+      $('[data-act="clearPage"]')?.click(); await W(300); d.querySelector('#sideTabs [data-side="1"]').click(); await W(500);
+      const r = d.querySelector('#canvas .page').getBoundingClientRect();
+      document.body.dataset.page = JSON.stringify([r.left, r.top, r.right, r.bottom]);
+      break;
+    }
+    case 'darksheet': { // то же на виде «Лист» зина
+      const inp = d.querySelector('[data-paper-custom]'); inp.value = '#1a2a4a';
+      inp.dispatchEvent(new w.Event('input', { bubbles: true })); inp.dispatchEvent(new w.Event('change', { bubbles: true })); await W(400);
+      d.querySelector('#viewTabs [data-view="sheet"]').click(); await W(600);
+      const r = d.querySelector('#canvas .sheet').getBoundingClientRect();
+      document.body.dataset.page = JSON.stringify([r.left, r.top, r.right, r.bottom]);
+      break;
+    }
+    case 'back': await page(7); break; // задняя обложка — для проверки, в набор itch не входит
+    case 'poster': d.querySelector('#sideTabs [data-side="1"]').click(); await W(600); break;
+  }
+  // убрать всплывающее сообщение
+  const t = $('#toast'); if (t) t.style.display = 'none';
+  await W(600);
+  document.title = 'ready';
+};
+</script>

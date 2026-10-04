@@ -1,0 +1,114 @@
+[
+ {
+  "id": "ibm-plex-sans",
+  "name": "IBM Plex Sans",
+  "role": "body",
+  "files": {
+   "i": "ibm-plex-sans-i.ttf",
+   "bi": "ibm-plex-sans-bi.ttf",
+   "r": "ibm-plex-sans-r.ttf",
+   "b": "ibm-plex-sans-b.ttf"
+  }
+ },
+ {
+  "id": "ibm-plex-serif",
+  "name": "IBM Plex Serif",
+  "role": "body",
+  "files": {
+   "i": "ibm-plex-serif-i.ttf",
+   "bi": "ibm-plex-serif-bi.ttf",
+   "r": "ibm-plex-serif-r.ttf",
+   "b": "ibm-plex-serif-b.ttf"
+  }
+ },
+ {
+  "id": "ibm-plex-mono",
+  "name": "IBM Plex Mono",
+  "role": "body",
+  "files": {
+   "i": "ibm-plex-mono-i.ttf",
+   "bi": "ibm-plex-mono-bi.ttf",
+   "r": "ibm-plex-mono-r.ttf",
+   "b": "ibm-plex-mono-b.ttf"
+  }
+ },
+ {
+  "id": "pt-serif",
+  "name": "PT Serif",
+  "role": "body",
+  "files": {
+   "i": "pt-serif-i.ttf",
+   "bi": "pt-serif-bi.ttf",
+   "r": "pt-serif-r.ttf",
+   "b": "pt-serif-b.ttf"
+  }
+ },
+ {
+  "id": "inter",
+  "name": "Inter",
+  "role": "body",
+  "files": {
+   "i": "inter-i.ttf",
+   "bi": "inter-bi.ttf",
+   "r": "inter-r.ttf",
+   "b": "inter-b.ttf"
+  }
+ },
+ {
+  "id": "onest",
+  "name": "Onest",
+  "role": "body",
+  "files": {
+   "r": "onest-r.ttf",
+   "b": "onest-b.ttf"
+  }
+ },
+ {
+  "id": "unbounded",
+  "name": "Unbounded",
+  "role": "heading",
+  "files": {
+   "r": "unbounded-r.ttf",
+   "b": "unbounded-b.ttf"
+  }
+ },
+ {
+  "id": "rubik",
+  "name": "Rubik",
+  "role": "heading",
+  "files": {
+   "i": "rubik-i.ttf",
+   "bi": "rubik-bi.ttf",
+   "r": "rubik-r.ttf",
+   "b": "rubik-b.ttf"
+  }
+ },
+ {
+  "id": "pixelify-sans",
+  "name": "Pixelify Sans",
+  "role": "heading",
+  "files": {
+   "r": "pixelify-sans-r.ttf",
+   "b": "pixelify-sans-b.ttf"
+  }
+ },
+ {
+  "id": "press-start",
+  "name": "Press Start 2P",
+  "role": "heading",
+  "files": {
+   "r": "press-start-r.ttf"
+  }
+ },
+ {
+  "id": "jetbrains-mono",
+  "name": "JetBrains Mono",
+  "role": "body",
+  "files": {
+   "i": "jetbrains-mono-i.ttf",
+   "bi": "jetbrains-mono-bi.ttf",
+   "r": "jetbrains-mono-r.ttf",
+   "b": "jetbrains-mono-b.ttf"
+  }
+ }
+]

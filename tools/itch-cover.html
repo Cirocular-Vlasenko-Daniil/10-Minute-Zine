@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- Обложка для itch.io (630×500, рисуется в 2× — 1260×1000) из настоящего примера зина.
+     Только для разработки: открыть через tools/serve.py — http://localhost:8765/tools/itch-cover.html,
+     PNG сохраняется в tools/debug/cover-itch.png. На сайт не попадает (нет в package.py). -->
+<meta charset="utf-8">
+<base href="/"><!-- шрифты и примеры грузятся относительными путями от корня сайта -->
+<title>itch cover</title>
+<style>body { margin: 0; background: #ddd; } canvas { display: block; width: 630px; height: 500px; }</style>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<canvas id="c" width="1260" height="1000"></canvas>
+<pre id="log"></pre>
+<script type="module">
+// модули — с той же меткой версии, что у редактора: иначе загрузятся вторые копии,
+// и картинки, зарегистрированные здесь, вёрстка не увидит
+const v = (await (await fetch('editor.html')).text()).match(/main\.js\?v=([0-9a-f]+)/)[1];
+const { normalize } = await import(`./js/model.js?v=${v}`);
+const { registerAsset, ensureLoaded, ditherURL, blurURL } = await import(`./js/images.js?v=${v}`);
+const { initFonts, ensureFont, cssFont } = await import(`./js/fonts.js?v=${v}`);
+const { pageDL } = await import(`./js/layout.js?v=${v}`);
+
+const S = 2, W = 630, H = 500, INK = '#2b2b2b', MUTE = '#a3a3a3';
+const log = (s) => (document.querySelector('#log').textContent += s + '\n');
+const img = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = src; });
+
+await initFonts();
+const file = await (await fetch('samples/en.zine')).json();
+for (const [id, a] of Object.entries(file.assets)) registerAsset(id, a);
+const doc = normalize(file.doc);
+await Promise.all(['pixelify-sans', 'ibm-plex-mono', doc.fonts.heading, doc.fonts.body].map(ensureFont));
+await ensureLoaded(Object.keys(file.assets));
+await new Promise((r) => setTimeout(r, 300));
+
+// Display list полосы -> canvas (те же примитивы, что рисуют SVG-рендер и PDF)
+async function drawItems(x, items) {
+  for (const it of items) {
+    x.save();
+    if (it.t === 'text') {
+      const f = cssFont(it.key);
+      x.font = `${f.style} ${f.weight} ${it.size}px "${f.family}"`;
+      x.fillStyle = it.fill;
+      x.fillText(it.s, it.x, it.y);
+    } else if (it.t === 'rect') {
+      x.globalAlpha = it.o ?? 1;
+      x.fillStyle = it.fill;
+      x.fillRect(it.x, it.y, it.w, it.h);
+    } else if (it.t === 'line') {
+      x.strokeStyle = it.stroke; x.lineWidth = it.w;
+      if (it.dash) x.setLineDash(it.dash);
+      x.beginPath(); x.moveTo(it.x1, it.y1); x.lineTo(it.x2, it.y2); x.stroke();
+    } else if (it.t === 'path') {
+      x.translate(it.x, it.y);
+      x.fillStyle = it.fill;
+      x.fill(new Path2D(it.d));
+    } else if (it.t === 'image') {
+      if (it.clip) { x.beginPath(); x.rect(it.clip.x, it.clip.y, it.clip.w, it.clip.h); x.clip(); }
+      if (it.blend === 'multiply') x.globalCompositeOperation = 'multiply';
+      const url = it.filter === 'dither' ? ditherURL(it) : blurURL({ ...it, blur: it.blur || 0 });
+      if (it.filter === 'dither') x.imageSmoothingEnabled = false;
+      if (url) x.drawImage(await img(url), it.x, it.y, it.w, it.h);
+    } else if (it.t === 'group') {
+      x.beginPath(); x.rect(it.clip.x, it.clip.y, it.clip.w, it.clip.h); x.clip();
+      await drawItems(x, it.items);
+    }
+    x.restore();
+  }
+}
+
+const cv = document.querySelector('#c'), x = cv.getContext('2d');
+x.scale(S, S);
+x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+// точечная сетка, как на холсте редактора
+x.fillStyle = '#d6d6d6';
+for (let gy = 8; gy < H; gy += 16) for (let gx = 8; gx < W; gx += 16) x.fillRect(gx, gy, 1.5, 1.5);
+
+// обложка зина справа: квадратная тень, как у логотипа
+const { L, items } = pageDL(doc, 0, 0); // экранный режим: осветление фона — отдельным слоем
+const ph = 404, k = ph / L.sf.h, pw = L.sf.w * k;
+const px = W - 40 - pw - 12, py = (H - ph) / 2 - 6;
+x.fillStyle = MUTE; x.fillRect(px + 12, py + 12, pw, ph);
+x.save();
+x.translate(px, py); x.scale(k, k);
+x.fillStyle = doc.paper; x.fillRect(0, 0, L.sf.w, L.sf.h);
+await drawItems(x, items);
+x.restore();
+x.strokeStyle = INK; x.lineWidth = 1.5; x.strokeRect(px, py, pw, ph);
+
+// название и подписи слева
+const lx = 40, colW = px - 40 - lx;
+x.fillStyle = INK; x.fillRect(lx, 62, 22, 22);
+x.fillStyle = MUTE; x.fillRect(lx + 6, 68, 22, 22);
+x.fillStyle = INK; x.fillRect(lx, 62, 22, 22);
+const fit = (t, font, max) => { let s = 120; do { x.font = `700 ${s}px ${font}`; s -= 1; } while (x.measureText(t).width > max); return s + 1; };
+const ts = fit('10 minute', '"zf-pixelify-sans"', colW);
+x.font = `700 ${ts}px "zf-pixelify-sans"`;
+x.fillStyle = INK;
+x.fillText('10 minute', lx - 2, 128 + ts * 0.72);
+x.fillText('zine', lx - 2, 128 + ts * 1.62);
+const mono = (sz, w = 400) => `${w} ${sz}px "zf-ibm-plex-mono"`;
+let ty = 128 + ts * 1.62 + 52;
+x.font = mono(17, 700);
+x.fillText('one sheet → 8-page zine', lx, ty);
+x.font = mono(17);
+x.fillText('print · fold · cut', lx, ty + 26);
+x.fillStyle = '#6b6b6b';
+x.font = mono(14);
+x.fillText('free · no sign-up · no ads', lx, H - 62);
+x.fillText('A4 · A3 · US Letter', lx, H - 40);
+
+const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+const res = await fetch('/__debug/cover-itch.png', { method: 'PUT', body: blob });
+log(`saved ${res.status} · title ${ts}px · page ${Math.round(pw)}×${ph}`);
+</script>

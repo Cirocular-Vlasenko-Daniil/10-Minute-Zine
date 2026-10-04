@@ -1,0 +1,7 @@
+# сборки и архивы — делаются tools/package.py и tools/package-itch.py
+dist/
+# отладочные PDF, PNG, скриншоты проверок
+tools/debug/
+preview-sheet.png
+.DS_Store
+__pycache__/
