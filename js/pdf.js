@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface } from './model.js?v=52286f3f';
-import { pageDL } from './layout.js?v=52286f3f';
-import { fontBytes, glyphPath } from './fonts.js?v=52286f3f';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=52286f3f';
+import { FORMATS, IMPOSITION, surface } from './model.js?v=8245e59c';
+import { pageDL } from './layout.js?v=8245e59c';
+import { fontBytes, glyphPath } from './fonts.js?v=8245e59c';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=8245e59c';
 
 const K = 72 / 25.4;
 
@@ -104,6 +104,13 @@ export async function buildPDF(doc, o) {
             page.drawImage(sil, { x: it.x, y: H - it.y - it.h, width: it.w, height: it.h, blendMode: PDFLib.BlendMode.Difference });
           }
           if (c) page.pushOperators(popGraphicsState());
+        } else if (it.t === 'group' && it.m) {
+          // повёрнутый блок: матрица задана в координатах страницы (ось Y вниз), а здесь Y вверх —
+          // переводим: T = F·M·F⁻¹, где F(x, y) = (x, H − y)
+          const [a, b, c, d, e, f] = it.m;
+          page.pushOperators(pushGraphicsState(), concatTransformationMatrix(a, -b, -c, d, c * H + e, H - d * H - f));
+          await draw(it.items);
+          page.pushOperators(popGraphicsState());
         } else if (it.t === 'group') { // часть блока через корешок — обрезаем по краю полосы
           const c = it.clip;
           page.pushOperators(pushGraphicsState(), rectangle(c.x, H - c.y - c.h, c.w, c.h), clip(), endPath());

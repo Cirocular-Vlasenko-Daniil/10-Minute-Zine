@@ -322,3 +322,5 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
   /* пока открыт нижний лист, миниатюры прячем — больше места странице */
   body.m-palette #nav, body.m-inspector #nav { display: none; }
 }
+/* выключка вертикальных блоков: значки повёрнуты, как текст */
+.seg[data-vert] .ic { transform: rotate(-90deg); }

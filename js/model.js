@@ -1,6 +1,6 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=52286f3f';
+import { t, getLang } from './i18n.js?v=8245e59c';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
@@ -61,6 +61,9 @@ export const PAPERS = [
 export const BLOCKS = {
   heading:  { name: 'Заголовок', w: 99, h: 1, minW: 1, minH: 1, maxH: 3, def: () => ({ text: t('Заголовок'), size: 'L', align: 'left' }) },
   text:     { name: 'Текст', w: 99, h: 2, minW: 1, minH: 1, maxH: 99, def: () => ({ text: '', text2: '', text3: '', size: 'body', cols: 1 }) },
+  // повёрнутые на 90° против часовой: читаются снизу вверх, строки идут слева направо
+  vheading: { name: 'Вертикальный заголовок', w: 1, h: 4, minW: 1, minH: 2, maxH: 99, def: () => ({ text: t('Заголовок'), size: 'L', align: 'left' }) },
+  vtext:    { name: 'Вертикальный текст', w: 2, h: 4, minW: 1, minH: 2, maxH: 99, def: () => ({ text: '', size: 'body' }) },
   quote:    { name: 'Цитата', w: 99, h: 2, minW: 2, minH: 1, maxH: 4, def: () => ({ text: '', by: '' }) },
   image:    { name: 'Картинка', w: 99, h: 3, minW: 1, minH: 1, maxH: 99, def: () => ({ asset: null, zoom: 1, px: 0.5, py: 0.5, filter: 'gray', grain: 0.4 }) },
   imagecap: { name: 'Картинка с подписью', w: 99, h: 3, minW: 1, minH: 2, maxH: 99, def: () => ({ asset: null, zoom: 1, px: 0.5, py: 0.5, filter: 'gray', grain: 0.4, caption: '' }) },

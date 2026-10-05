@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf } from './model.js?v=52286f3f';
-import { t } from './i18n.js?v=52286f3f';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=52286f3f';
-import { parseText, countChars } from './md.js?v=52286f3f';
-import { fitRect, assets } from './images.js?v=52286f3f';
-import { qrGrid, gridPath } from './qr.js?v=52286f3f';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf } from './model.js?v=8245e59c';
+import { t } from './i18n.js?v=8245e59c';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=8245e59c';
+import { parseText, countChars } from './md.js?v=8245e59c';
+import { fitRect, assets } from './images.js?v=8245e59c';
+import { qrGrid, gridPath } from './qr.js?v=8245e59c';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -180,7 +180,9 @@ export function capacity(key, st, w, h, cols = 1, gap = 0) {
 
 
 const shift = (it, dx, dy) =>
-  it.t === 'line' ? { ...it, x1: it.x1 + dx, x2: it.x2 + dx, y1: it.y1 + dy, y2: it.y2 + dy } : { ...it, x: it.x + dx, y: it.y + dy };
+  it.t === 'line' ? { ...it, x1: it.x1 + dx, x2: it.x2 + dx, y1: it.y1 + dy, y2: it.y2 + dy }
+    : it.m ? { ...it, m: [it.m[0], it.m[1], it.m[2], it.m[3], it.m[4] + dx, it.m[5] + dy] } // группа с трансформацией
+    : { ...it, x: it.x + dx, y: it.y + dy };
 
 // Вертикальное положение текста (b.valign: top/middle/bottom) и плашка выколотки (b.knock):
 // 'fit' — плашка по высоте текста, прижата к верху/центру/низу блока; 'fill' — плашка на весь блок.
@@ -228,6 +230,15 @@ export function buildBlock(b, box, ctx) {
   const ph = (label) => (editor ? [{ t: 'ph', x: 0, y: 0, w, h, label }] : []);
 
   switch (b.type) {
+    case 'vheading':
+    case 'vtext': {
+      // вертикальный блок: вёрстка обычного заголовка/текста в поле, повёрнутом на бок (ширина — высота
+      // блока), затем поворот на 90° против часовой: (x, y) -> (y, H − x). Читается снизу вверх,
+      // строки — слева направо; выключка, выколотка, прижатие, счётчик знаков — как у горизонтальных
+      const flat = { ...b, type: b.type === 'vheading' ? 'heading' : 'text', cols: 1 };
+      const r = buildBlock(flat, { ...box, w: h, h: w }, ctx);
+      return { ...r, items: [{ t: 'group', m: [0, -1, 1, 0, 0, h], items: r.items }] };
+    }
     case 'heading': {
       const st = T.h[b.size] || T.h.L;
       const pad = b.knock ? g * 0.45 : 0;

@@ -278,4 +278,6 @@ export const EN = {
   'Нижний край': 'Bottom edge',
   'Левый край': 'Left edge',
   'Блоки добавляются на вкладке «Страницы»': 'Blocks are added on the “Pages” tab',
+  'Вертикальный заголовок': 'Vertical heading',
+  'Вертикальный текст': 'Vertical text',
 };

@@ -1,16 +1,16 @@
-import * as M from './model.js?v=52286f3f';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=52286f3f';
-import { initAnalytics, track } from './analytics.js?v=52286f3f';
-import { initFonts, ensureFont, fontList, hasFont } from './fonts.js?v=52286f3f';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=52286f3f';
-import { randomPalette } from './palette.js?v=52286f3f';
-import { pageSVG, svgInner } from './render.js?v=52286f3f';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=52286f3f';
-import { pagesZip } from './raster.js?v=52286f3f';
-import { buildPDF } from './pdf.js?v=52286f3f';
-import { htmlToMd, looksLikeMd } from './md.js?v=52286f3f';
-import { flowMarkdown } from './flow.js?v=52286f3f';
-import * as store from './store.js?v=52286f3f';
+import * as M from './model.js?v=8245e59c';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=8245e59c';
+import { initAnalytics, track } from './analytics.js?v=8245e59c';
+import { initFonts, ensureFont, fontList, hasFont } from './fonts.js?v=8245e59c';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=8245e59c';
+import { randomPalette } from './palette.js?v=8245e59c';
+import { pageSVG, svgInner } from './render.js?v=8245e59c';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=8245e59c';
+import { pagesZip } from './raster.js?v=8245e59c';
+import { buildPDF } from './pdf.js?v=8245e59c';
+import { htmlToMd, looksLikeMd } from './md.js?v=8245e59c';
+import { flowMarkdown } from './flow.js?v=8245e59c';
+import * as store from './store.js?v=8245e59c';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -30,8 +30,12 @@ const ICONS = {
   right: ['########', '........', '...#####', '........', '.#######', '........', '....####', '........'],
   justify: ['########', '........', '########', '........', '########', '........', '#####...', '........'],
   force: ['########', '........', '########', '........', '########', '........', '########', '........'],
+  // вертикальные — те же значки, повёрнутые на 90° против часовой (заполняются ниже)
   spacer: ['##....##', '#......#', '........', '........', '........', '........', '#......#', '##....##'],
 };
+const rotCCW = (g) => g.map((_, y) => g.map((r) => r[7 - y]).join(''));
+ICONS.vheading = rotCCW(ICONS.heading);
+ICONS.vtext = rotCCW(ICONS.text);
 const icon = (t) => `<svg class="ic" viewBox="0 0 8 8" shape-rendering="crispEdges">${ICONS[t]
   .map((r, y) => [...r].map((c, x) => (c === '#' ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : '')).join('')).join('')}</svg>`;
 
@@ -261,8 +265,10 @@ function sizeRect(f, L, w, h) {
 }
 
 // Выключка: пиксельные иконки вместо подписей
+// у вертикальных блоков значки повёрнуты, как сам текст («влево» — строки от низа)
+const isVert = (b) => b.type === 'vheading' || b.type === 'vtext';
 const alignUI = (b, opts, label = tr('Выключка')) =>
-  `<div class="fld"><label>${label}</label>${seg('data-set-align', opts.map((v) => [v, icon(v)]), b.align || 'left')}</div>`;
+  `<div class="fld"><label>${label}</label>${seg('data-set-align', opts.map((v) => [v, icon(v)]), b.align || 'left', isVert(b) ? 'data-vert' : '')}</div>`;
 
 // Прилипание краёв к соседним рядам/колонкам: край перешагивает промежуток сетки
 function exUI(f, L) {
@@ -311,7 +317,9 @@ function inkUI(b, attr = 'data-set-color', cur = b.color) {
 function knockUI(b) {
   const k = b.knock || '';
   return `${inkUI(b)}<div class="fld"><label>${tr('Выколотка')}</label>${seg('data-set-knock', [['', tr('Нет')], ['fit', tr('По тексту')], ['fill', tr('Весь блок')]], k)}</div>
-    <div class="fld"><label>${k === 'fit' ? tr('Плашка прижата') : tr('Текст прижат')}</label>${seg('data-set-valign', [['top', tr('Верх')], ['middle', tr('Центр')], ['bottom', tr('Низ')]], b.valign || 'top')}</div>`;
+    <div class="fld"><label>${k === 'fit' ? tr('Плашка прижата') : tr('Текст прижат')}</label>${seg('data-set-valign', isVert(b)
+      ? [['top', tr('Слева')], ['middle', tr('Центр')], ['bottom', tr('Справа')]] // повёрнутый: «верх» блока — его левый край
+      : [['top', tr('Верх')], ['middle', tr('Центр')], ['bottom', tr('Низ')]], b.valign || 'top')}</div>`;
 }
 
 function blockPanel(f) {
@@ -334,9 +342,17 @@ function blockPanel(f) {
     ${b.asset && assets[b.asset] ? zoomUI(b, S.info[b.id]?.img, `${P('zoom')} data-num`, 'fitImg') : ''}`;
   switch (b.type) {
     case 'heading':
+    case 'vheading':
       body = `<div class="fld"><label>${tr('Текст')}</label><textarea rows="3" ${P('text')}>${esc(b.text)}</textarea></div>
         <div class="fld"><label>${tr('Размер')}</label>${seg('data-set-size', [['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL']], b.size)}</div>
         ${alignUI(b, ['left', 'center', 'right'])}
+        ${knockUI(b)}`;
+      break;
+    case 'vtext':
+      body = `<div class="fld"><label>${tr('Текст')} <span class="colmeter" data-colmeter="0"></span></label>
+          <textarea rows="10" ${P('text')}>${esc(b.text || '')}</textarea></div>
+        ${alignUI(b, ['left', 'center', 'right', 'justify', 'force'])}
+        <div class="fld"><label>${tr('Кегль')}</label>${seg('data-set-size', [['small', tr('Мелкий')], ['body', tr('Основной')], ['large', tr('Крупный')]], b.size)}</div>
         ${knockUI(b)}`;
       break;
     case 'text':
@@ -404,7 +420,7 @@ function blockPanel(f) {
         })() : ''}`;
       break;
   }
-  const hasMeter = ['heading', 'text', 'quote', 'imagecap', 'qr'].includes(b.type);
+  const hasMeter = ['heading', 'text', 'quote', 'imagecap', 'qr', 'vheading', 'vtext'].includes(b.type);
   return `<div class="sec"><div class="ihead">${icon(b.type)}<b>${tr(def.name)}</b><span class="grow"></span>
       <button data-act="dup" title="${tr('Дублировать (⌘D)')}">⧉</button><button data-act="del" title="${tr('Удалить (Del)')}">✕</button></div></div>
     <div class="sec"><div class="fld"><label>${tr('Ширина')}</label>${seg('data-size-w', wOpts, b.w)}</div>

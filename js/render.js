@@ -1,7 +1,7 @@
 // Display list -> SVG (редактор, превью листа, миниатюры)
 
-import { cssFont } from './fonts.js?v=52286f3f';
-import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=52286f3f';
+import { cssFont } from './fonts.js?v=8245e59c';
+import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=8245e59c';
 
 const n = (v) => +v.toFixed(3);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -70,6 +70,7 @@ export function svgInner(items) {
       }
       case 'ph': out += ph(it); break;
       case 'group': { // часть блока, обрезанная по краю полосы (общая сетка разворота)
+        if (it.m) { out += `<g transform="matrix(${it.m.map(n).join(' ')})">${svgInner(it.items)}</g>`; break; } // повёрнутый блок
         const c = it.clip;
         out += `<svg x="${n(c.x)}" y="${n(c.y)}" width="${n(c.w)}" height="${n(c.h)}" viewBox="${n(c.x)} ${n(c.y)} ${n(c.w)} ${n(c.h)}">${svgInner(it.items)}</svg>`;
         break;
