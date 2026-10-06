@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount, gutterOf, creepOf } from './model.js?v=0b8a1bd7';
-import { t } from './i18n.js?v=0b8a1bd7';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=0b8a1bd7';
-import { parseText, countChars } from './md.js?v=0b8a1bd7';
-import { fitRect, assets } from './images.js?v=0b8a1bd7';
-import { qrGrid, gridPath } from './qr.js?v=0b8a1bd7';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount, gutterOf, creepOf } from './model.js?v=0a43975c';
+import { t } from './i18n.js?v=0a43975c';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=0a43975c';
+import { parseText, countChars } from './md.js?v=0a43975c';
+import { fitRect, assets } from './images.js?v=0a43975c';
+import { qrGrid, gridPath } from './qr.js?v=0a43975c';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -27,17 +27,26 @@ export function typeScale(s) {
 
 // ---------- текст ----------
 
+// Слова строки. Пробелы, которые набрал человек, сохраняются: в начале строки — отступом перед
+// первым словом, между словами — один разделитель, остальные — частью следующего слова.
+// Табуляция — 4 пробела.
 function words(runs, keyOf) {
   const out = [];
-  let cur = null;
-  const flush = () => { if (cur?.length) out.push(cur); cur = null; };
+  let cur = null, pad = '', lineStart = true;
+  const flush = () => { if (cur?.length) { out.push(cur); lineStart = false; } cur = null; };
   for (const r of runs) {
-    if (r.br) { flush(); out.push('br'); continue; }
+    if (r.br) { flush(); out.push('br'); pad = ''; lineStart = true; continue; }
     const key = keyOf(r.b, r.i);
     for (const part of r.t.split(/(\s+)/)) {
       if (!part) continue;
-      if (/^\s+$/.test(part)) { flush(); continue; }
-      (cur ||= []).push({ key, t: part });
+      if (/^\s+$/.test(part)) {
+        const n = part.replace(/\t/g, '    ').length;
+        if (cur?.length || !lineStart) { flush(); pad += ' '.repeat(n - 1); } // первый — разделитель
+        else pad += ' '.repeat(n); // отступ в начале строки
+        continue;
+      }
+      (cur ||= []).push({ key, t: pad + part });
+      pad = '';
     }
   }
   flush();

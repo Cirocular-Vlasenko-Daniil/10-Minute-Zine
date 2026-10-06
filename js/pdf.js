@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=0b8a1bd7';
-import { pageDL } from './layout.js?v=0b8a1bd7';
-import { fontBytes, glyphPath } from './fonts.js?v=0b8a1bd7';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=0b8a1bd7';
+import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=0a43975c';
+import { pageDL } from './layout.js?v=0a43975c';
+import { fontBytes, glyphPath } from './fonts.js?v=0a43975c';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=0a43975c';
 
 const K = 72 / 25.4;
 

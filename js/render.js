@@ -1,7 +1,7 @@
 // Display list -> SVG (редактор, превью листа, миниатюры)
 
-import { cssFont } from './fonts.js?v=0b8a1bd7';
-import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=0b8a1bd7';
+import { cssFont } from './fonts.js?v=0a43975c';
+import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=0a43975c';
 
 const n = (v) => +v.toFixed(3);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -44,7 +44,10 @@ export function svgInner(items) {
     switch (it.t) {
       case 'text': {
         const f = cssFont(it.key);
-        out += `<text x="${n(it.x)}" y="${n(it.y)}" font-family="${f.family}" font-weight="${f.weight}" font-style="${f.style}" font-size="${n(it.size)}" fill="${it.fill}">${esc(it.s)}</text>`;
+        // пробелы в начале и подряд — неразрывными: обычные браузер в SVG схлопывает (xml:space
+        // современный Chrome не учитывает); во всех наших шрифтах ширина у них одинаковая
+        const txt = esc(it.s).replace(/^ +| {2,}/g, (m) => '\u00a0'.repeat(m.length));
+        out += `<text x="${n(it.x)}" y="${n(it.y)}" font-family="${f.family}" font-weight="${f.weight}" font-style="${f.style}" font-size="${n(it.size)}" fill="${it.fill}">${txt}</text>`;
         break;
       }
       case 'rect':
