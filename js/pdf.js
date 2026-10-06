@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=fa55acfe';
-import { pageDL } from './layout.js?v=fa55acfe';
-import { fontBytes, glyphPath } from './fonts.js?v=fa55acfe';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=fa55acfe';
+import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint, isSquare, squareArea } from './model.js?v=076f44a3';
+import { pageDL } from './layout.js?v=076f44a3';
+import { fontBytes, glyphPath } from './fonts.js?v=076f44a3';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=076f44a3';
 
 const K = 72 / 25.4;
 
@@ -53,6 +53,8 @@ export async function buildPDF(doc, o) {
     // листы PDF этой стороны: зин и постер — один лист; брошюра — дома листы для двусторонней
     // печати (по две страницы, порядок для скрепки), в типографию — постранично с вылетами
     const all = { top: true, bottom: true, left: true, right: true };
+    // квадратный зин: в типографию — только рабочая часть листа; дома — лист целиком, полоса снизу
+    const square = isSquare(doc), areaH = square ? squareArea(doc)[1] : 0;
     let sheets;
     if (side.type === 'booklet') {
       const n = pageCount(doc, si);
@@ -63,8 +65,10 @@ export async function buildPDF(doc, o) {
           return bp.sheets.map((p) => ({ size: bp.size, bp, cells: p.cells,
             slots: p.cells.flatMap((c) => c.pages.map((pi, j) => ({ pi, x: c.x + j * sf.w, y: c.y, rot: 0, edge: all }))) }));
         })();
-    } else if (side.type === 'poster') sheets = [{ size: [sf.w, sf.h], slots: [{ pi: 0, x: 0, y: 0, rot: 0 }] }];
-    else sheets = [{ size: F.sheet, slots: IMPOSITION.map(([pi, c, r, rot]) => ({ pi, x: c * sf.w, y: r * sf.h, rot, edge: { top: r === 0, bottom: r === 1, left: c === 0, right: c === 3 } })) }];
+    } else if (side.type === 'poster') {
+      // постер на обороте квадратного зина дома — на листе целиком, в той же рабочей части сверху
+      sheets = [{ size: square && !press ? F.sheet : [sf.w, sf.h], slots: [{ pi: 0, x: 0, y: 0, rot: 0 }] }];
+    } else sheets = [{ size: square && press ? squareArea(doc) : F.sheet, slots: IMPOSITION.map(([pi, c, r, rot]) => ({ pi, x: c * sf.w, y: r * sf.h, rot, edge: { top: r === 0, bottom: r === 1, left: c === 0, right: c === 3 } })) }];
     for (const sheet of sheets) {
     const [SW, SH] = sheet.size;
     const page = pdf.addPage([(SW + 2 * off) * K, (SH + 2 * off) * K]);
@@ -73,8 +77,10 @@ export async function buildPDF(doc, o) {
       page.setBleedBox(pad * K, pad * K, (SW + 2 * bleed) * K, (SH + 2 * bleed) * K);
     }
     // цвет листа — под вылеты тоже; не печатаем, если выбран режим «цветная бумага»
+    // у квадратного зина дома — только рабочая часть: полосу всё равно выбросят
     if (doc.paperPrint && doc.paper && doc.paper.toLowerCase() !== '#ffffff') {
-      page.drawRectangle({ x: 0, y: 0, width: (SW + 2 * off) * K, height: (SH + 2 * off) * K, color: hex(doc.paper) });
+      const strip = square && !press ? SH - areaH : 0;
+      page.drawRectangle({ x: 0, y: strip * K, width: (SW + 2 * off) * K, height: (SH + 2 * off - strip) * K, color: hex(doc.paper) });
     }
     const slots = sheet.slots;
 
@@ -147,9 +153,15 @@ export async function buildPDF(doc, o) {
     // надрез в центре листа — внутри, наружными метками его не показать, поэтому линия
     // рисуется в обоих режимах (раньше только для дома — в типографском PDF надреза не было)
     if (o.guides && zine) {
-      const c = rgb(0.72, 0.72, 0.72);
-      L(sf.w, SH / 2, sf.w * 3, SH / 2, 0.15, c, [1.2, 1]); // разрез
-      for (const x of [sf.w, sf.w * 3]) { L(x - 1.2, SH / 2, x + 1.2, SH / 2, 0.15, c); L(x, SH / 2 - 1.2, x, SH / 2 + 1.2, 0.15, c); }
+      const c = rgb(0.72, 0.72, 0.72), cy = SH - sf.h; // между рядами (у квадратного зина — не середина листа)
+      L(sf.w, cy, sf.w * 3, cy, 0.15, c, [1.2, 1]); // разрез
+      for (const x of [sf.w, sf.w * 3]) { L(x - 1.2, cy, x + 1.2, cy, 0.15, c); L(x, cy - 1.2, x, cy + 1.2, 0.15, c); }
+    }
+    // квадратный зин дома: отрез полосы — пунктир через весь лист, с засечками у краёв
+    if (square && !press && SH > areaH + 0.01) {
+      const c = rgb(0.45, 0.45, 0.45), y = SH - areaH;
+      L(0, y, SW, y, 0.25, c, [2.5, 1.5]);
+      L(0, y - 3, 0, y + 3, 0.25, c); L(SW, y - 3, SW, y + 3, 0.25, c);
     }
     if (press && o.marks) {
       const c = rgb(0, 0, 0), a = bleed + 1, b = off - 1, t = 0.1;

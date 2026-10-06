@@ -1,6 +1,6 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=fa55acfe';
+import { t, getLang } from './i18n.js?v=076f44a3';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
@@ -73,9 +73,10 @@ export const SPREADS_JOINED = [[7, 0], [1, 2], [3, 4], [5, 6]];
 export const GRIDS = {
   zine: [[2, 3], [2, 4], [3, 4], [3, 6], [4, 4], [4, 6], [3, 8], [4, 8], [3, 10], [4, 10]],
   booklet: [[2, 4], [3, 6], [4, 6], [4, 8], [3, 10], [4, 10], [6, 10], [6, 12]],
+  square: [[2, 2], [2, 3], [3, 3], [3, 4], [4, 4], [4, 5], [5, 5], [6, 6]],
   poster: [[2, 4], [3, 6], [3, 8], [4, 8], [3, 10], [4, 10], [6, 8]],
 };
-export const GRID_DEF = { zine: [3, 6], poster: [3, 8], booklet: [4, 8] };
+export const GRID_DEF = { zine: [3, 6], poster: [3, 8], booklet: [4, 8], square: [3, 3] };
 
 // Кегль подстраивается под плотность сетки: реже сетка — крупнее шрифт.
 // Нижняя граница 0.9 — основной текст на A7 не мельче ~7.2 pt.
@@ -262,6 +263,23 @@ export function blankBooklet(size, n = BOOKLET_PAGES.def) {
   return d;
 }
 
+// Сменить вид страниц зина (классическая / квадратная): страницы без своей сетки получают сетку
+// по умолчанию нового вида, блоки пересчитываются; если не влезают — остаётся прежняя сетка
+export function setShape(doc, shape) {
+  const before = doc.sides.map((s, si) => (s.type === 'zine' ? s.pages.map((_, pi) => pageSf(doc, si, pi)) : null));
+  doc.shape = shape;
+  doc.sides.forEach((s, si) => {
+    if (s.type !== 'zine') return;
+    s.pages.forEach((p, pi) => {
+      if (p.grid) return;
+      const from = before[si][pi], to = pageSf(doc, si, pi);
+      if (from.cols === to.cols && from.rows === to.rows) return;
+      const blocks = remapGrid(p, from, to);
+      if (blocks) p.blocks = blocks; else p.grid = [from.cols, from.rows];
+    });
+  });
+}
+
 // Брошюра: перестроить число страниц (новые встают перед задней обложкой, лишние — с конца, кроме неё)
 export function setBookletPages(doc, n) {
   const s = doc.sides[0], last = s.pages[s.pages.length - 1];
@@ -317,14 +335,25 @@ function migratePage(page) {
   page.blocks = out.filter((b) => BLOCKS[b.type]);
 }
 
+// Квадратный зин из одного листа (doc.shape = 'square'): та же схема 4 × 2 и один надрез,
+// но страница — квадрат со стороной в четверть длинной стороны листа (A4 — 74,25 мм, A3 — 105).
+// Ряды прижаты к верхнему краю, нижняя полоса листа отрезается перед сгибом и выбрасывается.
+export const isSquare = (doc) => doc.shape === 'square' && doc.sides.some((s) => s.type === 'zine');
+export const squareSide = (doc) => FORMATS[doc.format].sheet[0] / 4;
+// Рабочая часть листа квадратного зина (без отрезаемой полосы)
+export const squareArea = (doc) => [FORMATS[doc.format].sheet[0], squareSide(doc) * 2];
+
 export function surface(doc, si) {
   const F = FORMATS[doc.format];
   const side = doc.sides[si];
   if (side.type === 'poster') {
+    // постер на обороте квадратного зина — по рабочей части листа (альбомный), иначе его разрежет отрез
+    if (isSquare(doc)) { const [w, h] = squareArea(doc); return { kind: 'poster', w, h, margin: F.poster.margin, s: F.poster.s }; }
     const [a, b] = F.sheet;
     const [w, h] = side.poster.orient === 'landscape' ? [a, b] : [b, a];
     return { kind: 'poster', w, h, margin: F.poster.margin, s: F.poster.s };
   }
+  if (isSquare(doc) && side.type === 'zine') { const q = squareSide(doc); return { kind: 'square', w: q, h: q, margin: F.margin, s: F.s }; }
   if (side.type === 'booklet') { const b = bookletSize(doc); return { kind: 'booklet', w: b.page[0], h: b.page[1], margin: b.margin, s: b.s }; }
   return { kind: 'zine', w: F.page[0], h: F.page[1], margin: F.margin, s: F.s };
 }

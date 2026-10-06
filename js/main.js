@@ -1,16 +1,16 @@
-import * as M from './model.js?v=fa55acfe';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=fa55acfe';
-import { initAnalytics, track } from './analytics.js?v=fa55acfe';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=fa55acfe';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=fa55acfe';
-import { randomPalette } from './palette.js?v=fa55acfe';
-import { pageSVG, svgInner } from './render.js?v=fa55acfe';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=fa55acfe';
-import { pagesZip } from './raster.js?v=fa55acfe';
-import { buildPDF } from './pdf.js?v=fa55acfe';
-import { htmlToMd, looksLikeMd } from './md.js?v=fa55acfe';
-import { flowMarkdown } from './flow.js?v=fa55acfe';
-import * as store from './store.js?v=fa55acfe';
+import * as M from './model.js?v=076f44a3';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=076f44a3';
+import { initAnalytics, track } from './analytics.js?v=076f44a3';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=076f44a3';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=076f44a3';
+import { randomPalette } from './palette.js?v=076f44a3';
+import { pageSVG, svgInner } from './render.js?v=076f44a3';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=076f44a3';
+import { pagesZip } from './raster.js?v=076f44a3';
+import { buildPDF } from './pdf.js?v=076f44a3';
+import { htmlToMd, looksLikeMd } from './md.js?v=076f44a3';
+import { flowMarkdown } from './flow.js?v=076f44a3';
+import * as store from './store.js?v=076f44a3';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -204,8 +204,26 @@ function renderStage() {
   canvas.innerHTML = `<div class="spread${pages.length > 1 ? ' two' : ''}">${pages.map((p) => pageHTML(S.side, p, k)).join('')}</div>`;
 }
 
+// Полоса, которую у квадратного зина отрезают и выбрасывают: штриховка ниже рабочей части + линия отреза
+function stripSVG(SW, SH, y0) {
+  if (SH - y0 < 0.01) return '';
+  return `<defs><pattern id="strip" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="3" stroke="#b9b9b9" stroke-width="0.35"/></pattern></defs>
+    <rect x="0" y="${y0}" width="${SW}" height="${SH - y0}" fill="url(#strip)"/>
+    <line x1="0" y1="${y0}" x2="${SW}" y2="${y0}" stroke="#2b2b2b" stroke-width="0.3" stroke-dasharray="2.5 1.5"/>
+    <text x="${SW / 2}" y="${y0 + (SH - y0) / 2}" font-size="${Math.min(6, (SH - y0) / 6)}" text-anchor="middle" dominant-baseline="middle" fill="#7a7a7a" font-family="system-ui, sans-serif">${tr('отрезать перед сгибом')}</text>`;
+}
+
 function renderSheet(sf) {
   const sd = side();
+  if (sd.type === 'poster' && M.isSquare(S.doc)) { // оборот квадратного зина: постер в рабочей части листа
+    const [SW, SH] = M.FORMATS[S.doc.format].sheet, k = fitScale(SW, SH);
+    const { items } = pageDL(S.doc, S.side, 0);
+    canvas.innerHTML = `<div class="sheetwrap"><div class="sheet" style="width:${px(SW * k)}px;height:${px(SH * k)}px;background:${S.doc.paper}">
+      <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${svgInner(items)}${stripSVG(SW, SH, sf.h)}</svg>
+      <div class="slot" data-goto="0" style="left:0;top:0;width:100%;height:${(sf.h / SH) * 100}%"></div></div>
+      <div class="legend" style="max-width:${SW * k}px"><div class="note">${tr('Постер на обороте квадратного зина · {f} · печать с переворотом по короткому краю', { f: S.doc.format })}</div></div></div>`;
+    return;
+  }
   if (sd.type === 'poster') {
     const k = fitScale(sf.w, sf.h);
     const { items } = pageDL(S.doc, S.side, 0);
@@ -224,12 +242,16 @@ function renderSheet(sf) {
     slots += `<div class="slot${rot ? ' rot' : ''}" data-goto="${pi}" style="left:${(x / SW) * 100}%;top:${(y / SH) * 100}%;width:${(sf.w / SW) * 100}%;height:${(sf.h / SH) * 100}%"><span>${pi + 1}</span></div>`;
   }
   const guide = (x1, y1, x2, y2, dash, col) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="0.25" stroke-dasharray="${dash}"/>`;
-  const lines = [1, 2, 3].map((i) => guide(sf.w * i, 0, sf.w * i, SH, '0.5 1', '#9a9a9a')).join('')
-    + guide(0, SH / 2, sf.w, SH / 2, '0.5 1', '#9a9a9a') + guide(sf.w * 3, SH / 2, SW, SH / 2, '0.5 1', '#9a9a9a')
-    + guide(sf.w, SH / 2, sf.w * 3, SH / 2, '2 1', '#2b2b2b');
+  const sq = sf.kind === 'square', AH = 2 * sf.h, cy = sf.h; // у квадратного зина рабочая часть — верх листа
+  const lines = [1, 2, 3].map((i) => guide(sf.w * i, 0, sf.w * i, AH, '0.5 1', '#9a9a9a')).join('')
+    + guide(0, cy, sf.w, cy, '0.5 1', '#9a9a9a') + guide(sf.w * 3, cy, SW, cy, '0.5 1', '#9a9a9a')
+    + guide(sf.w, cy, sf.w * 3, cy, '2 1', '#2b2b2b') + (sq ? stripSVG(SW, SH, AH) : '');
+  const note = sq
+    ? tr('Лист {f} · квадратные страницы · сначала отрезать нижнюю полосу, потом складывать как обычно · верхний ряд вверх ногами — так и нужно', { f: S.doc.format })
+    : tr('Лист {f} · верхний ряд печатается вверх ногами — так и нужно', { f: S.doc.format });
   canvas.innerHTML = `<div class="sheetwrap"><div class="sheet" style="width:${px(SW * k)}px;height:${px(SH * k)}px;background:${S.doc.paper}">
     <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${g}${lines}</svg>${slots}</div>
-    <div class="legend" style="max-width:${SW * k}px"><div class="keys"><span><i></i>${tr('разрез')}</span><span><i class="d"></i>${tr('сгибы')}</span></div><div class="note">${tr('Лист {f} · верхний ряд печатается вверх ногами — так и нужно', { f: S.doc.format })}</div></div></div>`;
+    <div class="legend" style="max-width:${SW * k}px"><div class="keys"><span><i></i>${tr('разрез')}</span><span><i class="d"></i>${tr('сгибы')}</span></div><div class="note">${note}</div></div></div>`;
 }
 
 // Брошюра на виде «Лист»: все листы для домашней печати — лицо и оборот рядом, сгиб посередине
@@ -562,6 +584,8 @@ function docPanel() {
       <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
       <div class="note">${tr('Новые страницы встают перед задней обложкой, при уменьшении убираются последние внутренние')}</div></div>`
     : `<div class="fld"><label>${tr('Формат')}</label>${seg('data-doc-format', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], d.format)}</div>
+    ${d.sides.some((s) => s.type === 'zine') ? `<div class="fld"><label>${tr('Страницы')}</label>${seg('data-doc-shape', [['classic', tr('Классические')], ['square', tr('Квадратные')]], d.shape === 'square' ? 'square' : 'classic')}
+      ${M.isSquare(d) ? `<div class="note">${tr('Квадрат {q} мм; нижняя полоса листа отрезается и выбрасывается', { q: +M.squareSide(d).toFixed(2) })}</div>` : ''}</div>` : ''}
     <div class="fld"><label>${tr('Сторона A')}</label>${seg('data-side-a', [['zine', tr('Зин')], ['poster', tr('Постер')]], d.sides[0].type)}</div>
     <div class="fld"><label>${tr('Сторона B')}</label>${seg('data-side-b', [['none', tr('Пусто')], ['poster', tr('Постер')], ['zine', tr('Зин')]], d.sides[1].type)}</div>`}
     <div class="btns"><button data-act="randPalette" title="${tr('Бумага и три краски по правилам колористики')}">${tr('Случайная палитра')}</button></div>
@@ -577,7 +601,7 @@ function docPanel() {
       `<button class="sw${d.paper.toLowerCase() === c ? ' on' : ''}" data-paper="${c}" title="${tr(n)}" style="background:${c}"></button>`).join('')}
       <label class="sw custom${M.PAPERS.some(([c]) => c === d.paper.toLowerCase()) ? '' : ' on'}" title="${tr('свой цвет')}" style="background:${d.paper}"><input type="color" value="${d.paper}" data-paper-custom></label></div></div>
     <label class="chk"><input type="checkbox" data-paperprint ${d.paperPrint ? '' : 'checked'}> ${tr('Цветная бумага: фон не печатать')}</label>
-    ${anyPoster ? `<div class="fld"><label>${tr('Ориентация постера')}</label>${seg('data-orient', [['portrait', tr('Книжная')], ['landscape', tr('Альбомная')]], (d.sides.find((s) => s.type === 'poster')).poster.orient)}</div>` : ''}
+    ${anyPoster && !M.isSquare(d) ? `<div class="fld"><label>${tr('Ориентация постера')}</label>${seg('data-orient', [['portrait', tr('Книжная')], ['landscape', tr('Альбомная')]], (d.sides.find((s) => s.type === 'poster')).poster.orient)}</div>` : ''}
   </div>
   <div class="sec"><div class="lbl">${tr('Шрифты')}</div>
     <div class="fld"><label>${tr('Заголовки')}</label>${fontPick('heading', d.fonts.heading)}</div>
@@ -1375,6 +1399,7 @@ insp.addEventListener('click', async (e) => {
     S.doc.booklet = d.docBsize; S.doc.format = M.BOOKLET_SIZES[d.docBsize].paper;
     commit(); renderAll(); return;
   }
+  if (d.docShape) { M.setShape(S.doc, d.docShape === 'square' ? 'square' : undefined); if (!S.doc.shape) delete S.doc.shape; fixPos(); commit(); renderAll(); return; }
   if (d.docFormat) { S.doc.format = d.docFormat; }
   else if (d.sideA) { S.doc.sides[0].type = d.sideA; }
   else if (d.sideB) { S.doc.sides[1].type = d.sideB; if (d.sideB === 'none' && S.side === 1) S.side = 0; }
@@ -1613,6 +1638,7 @@ function openStart() {
       <div class="st-card">${PIC.sheet}<b>${tr('Зин из одного листа')}</b>
         <p>${tr('8 страниц на одном листе: распечатать, сложить, сделать один надрез. Можно добавить постер на обороте.')}</p>
         <div class="fld"><label>${tr('Лист')}</label>${seg('data-st-fmt', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], fmt)}</div>
+        <div class="fld"><label>${tr('Страницы')}</label>${seg('data-st-shape', [['classic', tr('Классические')], ['square', tr('Квадратные')]], 'classic')}</div>
         <button class="primary" data-st-new="sheet">${tr('Создать зин')}</button></div>
       <div class="st-card">${PIC.booklet}<b>${tr('Брошюра на скрепке')}</b>
         <p>${tr('Многостраничное издание: листы складываются пополам и скрепляются по сгибу.')}</p>
@@ -1634,7 +1660,7 @@ const closeStart = () => { $('#start').hidden = true; $('#start').innerHTML = ''
 $('#start').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  for (const k of ['stFmt', 'stBsize']) if (b.dataset[k]) { // переключатели внутри карточки
+  for (const k of ['stFmt', 'stBsize', 'stShape']) if (b.dataset[k]) { // переключатели внутри карточки
     b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     if (k === 'stBsize') $('[data-st-bnote]').textContent = bsizeNote(b.dataset.stBsize);
     return;
@@ -1649,6 +1675,7 @@ $('#start').addEventListener('click', async (e) => {
   const card = b.closest('.st-card');
   const fmt = card.querySelector('.seg .on').dataset[kind === 'booklet' ? 'stBsize' : 'stFmt'];
   const doc = kind === 'booklet' ? M.blankBooklet(fmt) : { ...M.blankDoc(), format: fmt };
+  if (kind === 'sheet' && card.querySelector('[data-st-shape].on')?.dataset.stShape === 'square') doc.shape = 'square';
   S.view = 'pages';
   await loadDoc(doc);
   commit(); closeStart();
