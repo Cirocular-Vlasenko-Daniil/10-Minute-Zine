@@ -1,16 +1,16 @@
-import * as M from './model.js?v=de1a2433';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=de1a2433';
-import { initAnalytics, track } from './analytics.js?v=de1a2433';
-import { initFonts, ensureFont, fontList, hasFont } from './fonts.js?v=de1a2433';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=de1a2433';
-import { randomPalette } from './palette.js?v=de1a2433';
-import { pageSVG, svgInner } from './render.js?v=de1a2433';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=de1a2433';
-import { pagesZip } from './raster.js?v=de1a2433';
-import { buildPDF } from './pdf.js?v=de1a2433';
-import { htmlToMd, looksLikeMd } from './md.js?v=de1a2433';
-import { flowMarkdown } from './flow.js?v=de1a2433';
-import * as store from './store.js?v=de1a2433';
+import * as M from './model.js?v=a9c1ab4d';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=a9c1ab4d';
+import { initAnalytics, track } from './analytics.js?v=a9c1ab4d';
+import { initFonts, ensureFont, fontList, hasFont } from './fonts.js?v=a9c1ab4d';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=a9c1ab4d';
+import { randomPalette } from './palette.js?v=a9c1ab4d';
+import { pageSVG, svgInner } from './render.js?v=a9c1ab4d';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=a9c1ab4d';
+import { pagesZip } from './raster.js?v=a9c1ab4d';
+import { buildPDF } from './pdf.js?v=a9c1ab4d';
+import { htmlToMd, looksLikeMd } from './md.js?v=a9c1ab4d';
+import { flowMarkdown } from './flow.js?v=a9c1ab4d';
+import * as store from './store.js?v=a9c1ab4d';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -433,7 +433,12 @@ function blockPanel(f) {
 function docPanel() {
   const d = S.doc, sd = side();
   const fonts = fontList();
-  const opt = (cur) => fonts.map((f) => `<option value="${f.id}" ${f.id === cur ? 'selected' : ''}>${f.name}</option>`).join('');
+  // шрифты по группам — список длинный, так в нём легче ориентироваться
+  const CATS = [['sans', tr('Гротески')], ['serif', tr('Антиквы')], ['display', tr('Акцидентные')], ['hand', tr('Рукописные')], ['mono', tr('Моноширинные')]];
+  const opt = (cur) => CATS.map(([c, name]) => {
+    const fs = fonts.filter((f) => (f.cat || 'sans') === c);
+    return fs.length ? `<optgroup label="${name}">${fs.map((f) => `<option value="${f.id}" ${f.id === cur ? 'selected' : ''}>${f.name}</option>`).join('')}</optgroup>` : '';
+  }).join('');
   let pageSec = '';
   if (sd.type !== 'none' && S.view !== 'sheet') { // на виде «Лист» — только настройки листа
     const L = pageLayout(d, S.side, S.page);

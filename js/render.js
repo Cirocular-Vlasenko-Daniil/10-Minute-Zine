@@ -1,7 +1,7 @@
 // Display list -> SVG (редактор, превью листа, миниатюры)
 
-import { cssFont } from './fonts.js?v=de1a2433';
-import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=de1a2433';
+import { cssFont } from './fonts.js?v=a9c1ab4d';
+import { assets, fitRect, ditherURL, blurURL, srcOf } from './images.js?v=a9c1ab4d';
 
 const n = (v) => +v.toFixed(3);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

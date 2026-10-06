@@ -283,4 +283,9 @@ export const EN = {
   'Блоки добавляются на вкладке «Страницы»': 'Blocks are added on the “Pages” tab',
   'Вертикальный заголовок': 'Vertical heading',
   'Вертикальный текст': 'Vertical text',
+  'Гротески': 'Sans serif',
+  'Антиквы': 'Serif',
+  'Акцидентные': 'Display',
+  'Рукописные': 'Handwritten',
+  'Моноширинные': 'Monospace',
 };
