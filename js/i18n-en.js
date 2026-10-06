@@ -4,9 +4,9 @@ export const EN = {
   'Сделать зин →': 'Make a zine →',
   'Сделать зин': 'Make a zine',
   'Доступный инструмент для создания малотиражных изданий': 'An accessible tool for making small-run publications',
-  'Зин из одного листа A4 или US Letter за десять минут. Собери его из готовых блоков, скачай PDF, распечатай — и сложи в маленькую книжку.':
-    'A one-sheet zine on A4 or US Letter in ten minutes. Build it from ready-made blocks, download the PDF, print it — and fold it into a tiny booklet.',
-  'Бесплатный шаблон и конструктор зина из одного листа': 'Free one page zine template & maker',
+  'Бесплатный конструктор зинов прямо в браузере: зин из одного листа A4 или US Letter за десять минут. Собери его из готовых блоков, скачай PDF, распечатай — и сложи в маленькую книжку.':
+    'A free zine maker right in your browser: a one-sheet zine on A4 or US Letter in ten minutes. Build it from ready-made blocks, download the PDF, print it — and fold it into a tiny booklet.',
+  'Сделай зин онлайн бесплатно — шаблон зина из одного листа': 'Make a zine online for free — one page zine template',
   '8 страниц · один лист · один разрез': '8 pages · one sheet · one cut',
   'Как это работает': 'How it works',
   'Собери': 'Build',
@@ -30,6 +30,9 @@ export const EN = {
   'A4 или US Letter — для карманного зина, A3 — если нужны страницы крупнее. Редактор сам разложит страницы на листе.': 'A4 or US Letter for a pocket-size zine, A3 for bigger pages. The editor lays the pages out on the sheet for you.',
   'Можно распечатать дома?': 'Can I print it at home?',
   'Да, подойдёт любой принтер. Поля сделаны с запасом для принтеров, которые не печатают до края. Печатай в масштабе 100%.': 'Yes, any printer works. Margins leave room for printers that can’t print to the edge. Print at 100% scale.',
+  'Как сделать зин онлайн бесплатно?': 'How do I make a zine online for free?',
+  'Открой редактор — ничего не нужно устанавливать и регистрироваться. Добавь заголовки, текст и картинки в готовые блоки, скачай PDF для печати, распечатай, сложи и разрежь. Весь зин — примерно десять минут.':
+    'Open the editor — there’s nothing to install and no account to create. Add headings, text and images to ready-made blocks, download the print-ready PDF, then print, fold and cut. The whole zine takes about ten minutes.',
   'Это бесплатно? Нужна регистрация?': 'Is it free? Do I need an account?',
   'Бесплатно, без регистрации и без рекламы. Зин хранится в твоём браузере, на сервер ничего не загружается.': 'It’s free, with no sign-up and no ads. Your zine is stored in your browser — nothing is uploaded.',
   'Сложи': 'Fold',

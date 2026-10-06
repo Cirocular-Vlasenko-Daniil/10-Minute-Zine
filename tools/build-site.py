@@ -53,13 +53,13 @@ PAGES = {
         "path": {"en": "/", "ru": "/ru/"},
         "out": {"en": "index.html", "ru": "ru/index.html"},
         "title": {
-            "en": "One Page Zine Template — Free Zine Maker | 10 minute zine",
-            "ru": "Шаблон зина из одного листа — бесплатный конструктор | 10 minute zine",
+            "en": "Make a Zine Online Free — One Page Zine Template | 10 minute zine",
+            "ru": "Сделать зин онлайн бесплатно — шаблон зина из одного листа | 10 minute zine",
         },
         "desc": {
-            "en": "Make a one page zine in 10 minutes. Free 8-page mini zine template and maker: "
-                  "print-ready PDF for A4 or US Letter — print, fold, cut. No sign-up, no cookies.",
-            "ru": "Зин из одного листа за 10 минут. Бесплатный шаблон и конструктор мини-зина на 8 страниц: "
+            "en": "Make a zine online for free in 10 minutes. One page zine template and maker for an 8-page mini zine: "
+                  "print-ready PDF for A4 or US Letter — print, fold, cut. No sign-up, no ads.",
+            "ru": "Сделай зин онлайн бесплатно за 10 минут. Шаблон и конструктор мини-зина на 8 страниц: "
                   "PDF для печати на A4 или US Letter — распечатай, сложи, разрежь. Без регистрации.",
         },
     },
@@ -124,6 +124,7 @@ def head(page, lang):
             "@context": "https://schema.org",
             "@type": "WebApplication",
             "name": "10 minute zine",
+            "alternateName": "Free online zine maker" if lang == "en" else "Бесплатный онлайн-конструктор зинов",
             "url": SITE + "/",
             "description": PAGES["landing"]["desc"][lang],
             "applicationCategory": "DesignApplication",
@@ -137,7 +138,20 @@ def head(page, lang):
                        "url": "https://github.com/Cirocular-Vlasenko-Daniil"},
         }
         lines.append('<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False) + "</script>")
+        lines.append("{{FAQ_LD}}")
     return "\n".join(lines)
+
+
+def faq_ld(page_html, lang):
+    """FAQPage из уже переведённых пар dt/dd — разметка всегда совпадает с видимым текстом."""
+    text = lambda s: html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
+    qa = re.findall(r"<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>", page_html, re.S)
+    if not qa:
+        return ""
+    ld = {"@context": "https://schema.org", "@type": "FAQPage", "inLanguage": lang,
+          "mainEntity": [{"@type": "Question", "name": text(q),
+                          "acceptedAnswer": {"@type": "Answer", "text": text(a)}} for q, a in qa]}
+    return '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False) + "</script>"
 
 
 def lang_switch(page, lang):
@@ -198,6 +212,7 @@ def build():
             }.items():
                 out = out.replace(k, v)
             out = translate(out, lang)
+            out = out.replace("{{FAQ_LD}}", faq_ld(out, lang))
             left = re.findall(r"\{\{\w+\}\}", out)
             if left:
                 sys.exit(f"{page}/{lang}: не подставлено {left}")
