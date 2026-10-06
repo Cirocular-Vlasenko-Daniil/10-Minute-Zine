@@ -323,5 +323,5 @@ export const EN = {
   'Бумага, г/м²': 'Paper, gsm',
   'Авто': 'Auto',
   'авто': 'auto',
-  'Выползание: при печати дома внутренние листы сдвигаются к корешку, центральный — на {c} мм. В PDF для типографии сдвига нет — его делает типография.': 'Creep: when printing at home, inner sheets shift toward the spine, the centre sheet by {c} mm. The print-shop PDF has no shift — the printer applies it.',
+  'Выползание: в PDF содержимое внутренних листов сдвигается к корешку, центрального — на {c} мм. Если типография делает компенсацию сама, предупредите её.': 'Creep: in the PDF the content of inner sheets shifts toward the spine, the centre sheet by {c} mm. If your printer applies its own compensation, tell them.',
 };

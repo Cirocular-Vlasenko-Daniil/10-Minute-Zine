@@ -1,16 +1,16 @@
-import * as M from './model.js?v=ac7257ed';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=ac7257ed';
-import { initAnalytics, track } from './analytics.js?v=ac7257ed';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=ac7257ed';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=ac7257ed';
-import { randomPalette } from './palette.js?v=ac7257ed';
-import { pageSVG, svgInner } from './render.js?v=ac7257ed';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=ac7257ed';
-import { pagesZip } from './raster.js?v=ac7257ed';
-import { buildPDF } from './pdf.js?v=ac7257ed';
-import { htmlToMd, looksLikeMd } from './md.js?v=ac7257ed';
-import { flowMarkdown } from './flow.js?v=ac7257ed';
-import * as store from './store.js?v=ac7257ed';
+import * as M from './model.js?v=0b8a1bd7';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=0b8a1bd7';
+import { initAnalytics, track } from './analytics.js?v=0b8a1bd7';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=0b8a1bd7';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=0b8a1bd7';
+import { randomPalette } from './palette.js?v=0b8a1bd7';
+import { pageSVG, svgInner } from './render.js?v=0b8a1bd7';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=0b8a1bd7';
+import { pagesZip } from './raster.js?v=0b8a1bd7';
+import { buildPDF } from './pdf.js?v=0b8a1bd7';
+import { htmlToMd, looksLikeMd } from './md.js?v=0b8a1bd7';
+import { flowMarkdown } from './flow.js?v=0b8a1bd7';
+import * as store from './store.js?v=0b8a1bd7';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -304,7 +304,7 @@ function sizeRect(f, L, w, h) {
 // Выползание: сколько сдвигаем центральный лист при домашней печати
 function creepNote(d) {
   const n = M.pageCount(d, 0), c = M.creepOf(d, 0, n / 2 - 1).toFixed(2).replace('.', ',');
-  return tr('Выползание: при печати дома внутренние листы сдвигаются к корешку, центральный — на {c} мм. В PDF для типографии сдвига нет — его делает типография.', { c });
+  return tr('Выползание: в PDF содержимое внутренних листов сдвигается к корешку, центрального — на {c} мм. Если типография делает компенсацию сама, предупредите её.', { c });
 }
 
 // Поле у корешка: подпись со значением и пометкой «авто»

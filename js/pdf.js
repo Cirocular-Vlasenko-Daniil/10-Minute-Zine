@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=ac7257ed';
-import { pageDL } from './layout.js?v=ac7257ed';
-import { fontBytes, glyphPath } from './fonts.js?v=ac7257ed';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=ac7257ed';
+import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=0b8a1bd7';
+import { pageDL } from './layout.js?v=0b8a1bd7';
+import { fontBytes, glyphPath } from './fonts.js?v=0b8a1bd7';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=0b8a1bd7';
 
 const K = 72 / 25.4;
 
@@ -88,8 +88,9 @@ export async function buildPDF(doc, o) {
           ? { t: v(e.bottom), b: v(e.top), l: v(e.right), r: v(e.left) }
           : { t: v(e.top), b: v(e.bottom), l: v(e.left), r: v(e.right) };
       }
-      // брошюра дома — с компенсацией выползания (в типографии её делают при спуске полос)
-      const { items } = pageDL(doc, si, s.pi, { print: true, bleed: bleedBox, creep: side.type === 'booklet' && !press });
+      // брошюра — с компенсацией выползания и дома, и для типографии: цифровая печать
+      // обычно печатает файл как есть, спуск со сдвигом не делает
+      const { items } = pageDL(doc, si, s.pi, { print: true, bleed: bleedBox, creep: side.type === 'booklet' });
       const x0 = off + s.x, y0 = off + SH - s.y - sf.h; // низ-лево полосы в мм (PDF: ось Y вверх)
       const m = s.rot ? [-K, 0, 0, -K, (x0 + sf.w) * K, (y0 + sf.h) * K] : [K, 0, 0, K, x0 * K, y0 * K];
       page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...m));
