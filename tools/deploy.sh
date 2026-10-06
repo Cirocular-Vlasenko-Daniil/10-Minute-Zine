@@ -12,6 +12,14 @@ set -euo pipefail
 HOST=zine
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# на 10minutezine.com — только ветка main (бета живёт в своей ветке и на сайт не уходит)
+BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+if [ "$BRANCH" != "main" ] && [ "${1:-}" != "--rollback" ]; then
+  echo "Сейчас ветка «$BRANCH» — на сайт выкладывается только main."
+  echo "Переключитесь: git -C \"$ROOT\" checkout main"
+  exit 1
+fi
+
 if [ "${1:-}" = "--rollback" ]; then
   ssh "$HOST" 'sudo bash ~/deploy.sh --rollback'
   exit 0
