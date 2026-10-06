@@ -27,7 +27,7 @@ shutil.copy2(SITE / "LICENSES.md", OUT / "LICENSES.md")
 html = (SITE / "editor.html").read_text(encoding="utf-8")
 n = 0
 html, k = re.subn(r'<a class="logo" href="\./"', '<a class="logo" href="https://10minutezine.com/" target="_blank" rel="noopener"', html); n += k
-html, k = re.subn(r'\s*<link rel="(icon|apple-touch-icon)"[^>]*>', "", html); n += k
+html, k = re.subn(r'\s*<link rel="(icon|apple-touch-icon|manifest)"[^>]*>', "", html); n += k  # приложение (PWA) — только на сайте
 assert 'href="https://10minutezine.com/" target="_blank"' in html, "логотип не найден — поменялась разметка editor.html?"
 (OUT / "index.html").write_text(html, encoding="utf-8")
 

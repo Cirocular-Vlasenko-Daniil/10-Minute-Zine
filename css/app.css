@@ -363,3 +363,6 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 .st-card p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink2); flex: 1; }
 .st-foot { display: flex; gap: 8px; }
 @media (max-width: 760px) { .st-cards { grid-template-columns: 1fr; } }
+.st-foot .grow { flex: 1; }
+.st-install { display: none; }
+body.can-install .st-install { display: inline-block; }

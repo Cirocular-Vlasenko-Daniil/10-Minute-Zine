@@ -309,4 +309,5 @@ export const EN = {
   'Открыть пример': 'Open sample',
   'Открыть файл .zine': 'Open .zine file',
   'Текущий проект будет заменён. Если он нужен — сначала сохраните его в .zine. Продолжить?': 'The current project will be replaced. Save it as .zine first if you need it. Continue?',
+  'Установить приложение': 'Install app',
 };

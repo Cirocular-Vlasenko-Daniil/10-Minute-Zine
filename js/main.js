@@ -1,16 +1,16 @@
-import * as M from './model.js?v=8c4ccd23';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=8c4ccd23';
-import { initAnalytics, track } from './analytics.js?v=8c4ccd23';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=8c4ccd23';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=8c4ccd23';
-import { randomPalette } from './palette.js?v=8c4ccd23';
-import { pageSVG, svgInner } from './render.js?v=8c4ccd23';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=8c4ccd23';
-import { pagesZip } from './raster.js?v=8c4ccd23';
-import { buildPDF } from './pdf.js?v=8c4ccd23';
-import { htmlToMd, looksLikeMd } from './md.js?v=8c4ccd23';
-import { flowMarkdown } from './flow.js?v=8c4ccd23';
-import * as store from './store.js?v=8c4ccd23';
+import * as M from './model.js?v=3b9ebbed';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=3b9ebbed';
+import { initAnalytics, track } from './analytics.js?v=3b9ebbed';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=3b9ebbed';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=3b9ebbed';
+import { randomPalette } from './palette.js?v=3b9ebbed';
+import { pageSVG, svgInner } from './render.js?v=3b9ebbed';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=3b9ebbed';
+import { pagesZip } from './raster.js?v=3b9ebbed';
+import { buildPDF } from './pdf.js?v=3b9ebbed';
+import { htmlToMd, looksLikeMd } from './md.js?v=3b9ebbed';
+import { flowMarkdown } from './flow.js?v=3b9ebbed';
+import * as store from './store.js?v=3b9ebbed';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -1580,10 +1580,15 @@ function openStart() {
         <div class="fld"><label>${tr('Страниц')}</label><select data-st-pages>${pages.map((n) => `<option ${n === M.BOOKLET_PAGES.def ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <button class="primary" data-st-new="booklet">${tr('Создать брошюру')}</button></div>
     </div>
-    <div class="st-foot"><button data-st-act="sample">${tr('Открыть пример')}</button><button data-st-act="open">${tr('Открыть файл .zine')}</button></div>
+    <div class="st-foot"><button data-st-act="sample">${tr('Открыть пример')}</button><button data-st-act="open">${tr('Открыть файл .zine')}</button>
+      <span class="grow"></span><button class="st-install" data-st-act="install">${tr('Установить приложение')}</button></div>
   </div>`;
   $('#start').hidden = false;
 }
+// «Установить приложение»: браузер предлагает установку (Chrome, Edge) — показываем кнопку
+let installEv = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEv = e; document.body.classList.add('can-install'); });
+window.addEventListener('appinstalled', () => { installEv = null; document.body.classList.remove('can-install'); });
 const closeStart = () => { $('#start').hidden = true; $('#start').innerHTML = ''; };
 $('#start').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
@@ -1595,6 +1600,7 @@ $('#start').addEventListener('click', async (e) => {
   if (b.dataset.stX !== undefined) return closeStart();
   if (b.dataset.stAct === 'sample') { closeStart(); return loadSample(); }
   if (b.dataset.stAct === 'open') { closeStart(); return $('#fileZine').click(); }
+  if (b.dataset.stAct === 'install') { installEv?.prompt(); return; }
   const kind = b.dataset.stNew;
   if (!kind) return;
   if (hasContent(S.doc) && !confirm(tr('Текущий проект будет заменён. Если он нужен — сначала сохраните его в .zine. Продолжить?'))) return;
@@ -1623,6 +1629,10 @@ initAnalytics();
   } else {
     await loadSample();
   }
+  // офлайн-приложение (PWA): на сайте по https; не на itch (там чужой домен) и не на сервере
+  // разработки — разве что с ?sw, чтобы проверить
+  const sw = 'serviceWorker' in navigator && ((location.protocol === 'https:' && !/itch\.zone$/.test(location.hostname)) || /[?&]sw\b/.test(location.search));
+  if (sw) navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('offline mode unavailable', err));
   // при запуске — выбор: продолжить или новый проект (для скриншотов и встраивания — ?nostart)
   if (!/[?&]nostart\b/.test(location.search)) openStart();
 })();

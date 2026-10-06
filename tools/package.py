@@ -12,7 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 OUT = DIST / "10minutezine"
 
-FILES = ["index.html", "editor.html", "contact.html", "404.html", "favicon.svg", "favicon-32.png",
+FILES = ["index.html", "editor.html", "contact.html", "404.html", "favicon.svg", "favicon-32.png", "manifest.webmanifest",
          "apple-touch-icon.png", "sitemap.xml", "robots.txt", "LICENSES.md"]
 DIRS = ["ru", "css", "js", "fonts", "vendor", "img", "samples"]
 SKIP = {".DS_Store"}
@@ -76,6 +76,25 @@ Options -Indexes
 """
 
 
+def write_sw():
+    """Офлайн-режим: sw.js со списком всего, что нужно редактору, — ровно с теми адресами
+    (метки ?v= и ?r=), которые запрашивает страница, иначе кэш не совпадёт."""
+    import json, re
+    ed = (OUT / "editor.html").read_text(encoding="utf-8")
+    v = re.search(r"main\.js\?v=([0-9a-f]+)", ed).group(1)
+    rev = re.search(r"FONT_REV = '([^']*)'", (OUT / "js/fonts.js").read_text(encoding="utf-8")).group(1)
+    files = ["/editor.html", "/manifest.webmanifest", "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/fonts/fonts.json"]
+    files += sorted("/img/" + p.name for p in (OUT / "img").glob("icon-*.png"))
+    files += ["/" + c for c in re.findall(r'href="/?(css/[\w-]+\.css\?v=[0-9a-f]+)"', ed)]
+    files += sorted(f"/js/{p.name}?v={v}" for p in (OUT / "js").glob("*.js"))
+    files += sorted("/vendor/" + p.name for p in (OUT / "vendor").glob("*.js"))
+    files += sorted(f"/fonts/{p.name}{rev}" for p in (OUT / "fonts").glob("*.ttf"))
+    files += sorted("/samples/" + p.name for p in (OUT / "samples").glob("*.zine"))
+    sw = (ROOT / "site-src/sw.js").read_text(encoding="utf-8")
+    sw = sw.replace("__VERSION__", v).replace("__FILES__", json.dumps(files, ensure_ascii=False, indent=1))
+    (OUT / "sw.js").write_text(sw, encoding="utf-8")
+
+
 def main():
     subprocess.run([sys.executable, str(ROOT / "tools/build-site.py")], check=True)
     if OUT.exists():
@@ -85,6 +104,7 @@ def main():
         shutil.copy2(ROOT / f, OUT / f)
     for d in DIRS:
         shutil.copytree(ROOT / d, OUT / d, ignore=shutil.ignore_patterns(*SKIP))
+    write_sw()
     (OUT / "_headers").write_text(HEADERS, encoding="utf-8")
     (OUT / ".htaccess").write_text(HTACCESS, encoding="utf-8")
 
