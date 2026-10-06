@@ -1,16 +1,16 @@
-import * as M from './model.js?v=15a49f67';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=15a49f67';
-import { initAnalytics, track } from './analytics.js?v=15a49f67';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=15a49f67';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=15a49f67';
-import { randomPalette } from './palette.js?v=15a49f67';
-import { pageSVG, svgInner } from './render.js?v=15a49f67';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=15a49f67';
-import { pagesZip } from './raster.js?v=15a49f67';
-import { buildPDF } from './pdf.js?v=15a49f67';
-import { htmlToMd, looksLikeMd } from './md.js?v=15a49f67';
-import { flowMarkdown } from './flow.js?v=15a49f67';
-import * as store from './store.js?v=15a49f67';
+import * as M from './model.js?v=1bdd9733';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=1bdd9733';
+import { initAnalytics, track } from './analytics.js?v=1bdd9733';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=1bdd9733';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=1bdd9733';
+import { randomPalette } from './palette.js?v=1bdd9733';
+import { pageSVG, svgInner } from './render.js?v=1bdd9733';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=1bdd9733';
+import { pagesZip } from './raster.js?v=1bdd9733';
+import { buildPDF } from './pdf.js?v=1bdd9733';
+import { htmlToMd, looksLikeMd } from './md.js?v=1bdd9733';
+import { flowMarkdown } from './flow.js?v=1bdd9733';
+import * as store from './store.js?v=1bdd9733';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -543,6 +543,8 @@ function docPanel() {
   <div class="sec"><div class="lbl">${tr('Лист')}</div>
     ${booklet ? `<div class="fld"><label>${tr('Размер страницы')}</label>${bsizeSeg('data-doc-bsize', d.booklet)}
       <div class="note">${bsizeNote(d.booklet)}</div></div>
+    <div class="fld"><label>${tr('Поле у корешка')} · +${d.gutter || 0} ${tr('мм')}</label><input type="range" min="0" max="20" step="1" value="${d.gutter || 0}" data-gutter>
+      <div class="note">${tr('Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца')}</div></div>
     <div class="fld"><label>${tr('Страниц')} · ${M.pageCount(d, 0)}</label><div class="btns">
       <button data-act="pagesDel" ${M.pageCount(d, 0) <= M.BOOKLET_PAGES.min ? 'disabled' : ''}>− 4</button>
       <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
@@ -1195,6 +1197,10 @@ insp.addEventListener('input', (e) => {
     if (t.dataset.bgprop === 'zoom') lab.textContent = `${tr('Масштаб')} · ${Math.round(t.value * 100)}%`;
     if (t.dataset.bgprop === 'blur') lab.textContent = `${tr('Блюр')} · ${(+t.value).toFixed(1)} ${tr('мм')}`;
     if (t.dataset.bgprop === 'grain') lab.textContent = `${tr('Зерно растра')} · ${(+t.value).toFixed(2)} ${tr('мм')}`;
+    renderView(); commitSoon();
+  } else if (t.dataset.gutter !== undefined) { // поле у корешка брошюры
+    S.doc.gutter = +t.value;
+    t.previousElementSibling.textContent = `${tr('Поле у корешка')} · +${t.value} ${tr('мм')}`;
     renderView(); commitSoon();
   } else if (t.dataset.inkCustom) {
     S.doc.colors[t.dataset.inkCustom] = t.value;

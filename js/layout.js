@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=15a49f67';
-import { t } from './i18n.js?v=15a49f67';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=15a49f67';
-import { parseText, countChars } from './md.js?v=15a49f67';
-import { fitRect, assets } from './images.js?v=15a49f67';
-import { qrGrid, gridPath } from './qr.js?v=15a49f67';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=1bdd9733';
+import { t } from './i18n.js?v=1bdd9733';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=1bdd9733';
+import { parseText, countChars } from './md.js?v=1bdd9733';
+import { fitRect, assets } from './images.js?v=1bdd9733';
+import { qrGrid, gridPath } from './qr.js?v=1bdd9733';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -414,7 +414,9 @@ function spreadLayout(doc, si, pair) {
   const base = singleLayout(doc, si, pair[0]);
   const { content, colW, rowH, g, page } = base;
   const W = base.sf.w, c = base.sf.cols;
-  const X = (k) => (k >= c ? W : 0) + content.x + (k % c) * (colW + g);
+  // у правой полосы своё начало сетки: поле у корешка у неё слева, у левой — справа
+  const xR = singleLayout(doc, si, pair[1]).content.x;
+  const X = (k) => (k >= c ? W + xR : content.x) + (k % c) * (colW + g);
   const sf = { ...base.sf, w: W * 2, cols: c * 2, pageW: W, pageCols: c, maxBlocks: base.sf.maxBlocks * 2 };
   const rect = (r) => withEx({ x: X(r.x), y: content.y + r.y * (rowH + g), w: X(r.x + r.w - 1) + colW - X(r.x), h: r.h * rowH + (r.h - 1) * g }, r, sf,
     // промежутки по горизонтали в общей сетке разные: у корешка — поля обеих полос
@@ -442,7 +444,11 @@ function singleLayout(doc, si, pi) {
   const Tb = typeScale(sf.s);        // колонтитулы — одинаковые на всех полосах
   const g = T.body.lead;
   const m = sf.margin;
-  const inner = { x: m, y: m, w: sf.w - 2 * m, h: sf.h - 2 * m };
+  // поле у корешка (брошюра): сетка отодвигается от сгиба. Правые страницы (нечётные номера) —
+  // корешок слева, левые (чётные) — справа; внешнее поле не меняется
+  const gut = sf.kind === 'booklet' ? Math.max(0, +doc.gutter || 0) : 0;
+  const spineLeft = (pi + 1) % 2 === 1;
+  const inner = { x: m + (spineLeft ? gut : 0), y: m, w: sf.w - 2 * m - gut, h: sf.h - 2 * m };
   const zine = sf.kind !== 'poster'; // многостраничное: зин или брошюра — с колонтитулами
   const hH = Tb.small.lead * 2;
   const top = zine && doc.hf.header.on ? hH : 0;

@@ -5,7 +5,7 @@
 //   full   — halftone QR: модуль делится на 3×3, центр хранит данные, 8 соседних — растр картинки.
 // В центральных режимах закрытые модули восстанавливает коррекция ошибок H (до 30% данных).
 
-import { ditherGrid, pixelGrid } from './images.js?v=15a49f67';
+import { ditherGrid, pixelGrid } from './images.js?v=1bdd9733';
 
 const cache = new Map();
 // minVer — не меньше этой версии: больше модулей — детальнее пиксель-арт в коде
