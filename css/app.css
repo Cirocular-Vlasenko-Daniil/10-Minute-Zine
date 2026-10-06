@@ -366,3 +366,7 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 .st-foot .grow { flex: 1; }
 .st-install { display: none; }
 body.can-install .st-install { display: inline-block; }
+/* размеры брошюры: шесть кнопок в два ряда */
+.seg.bsizes { flex-wrap: wrap; }
+.seg.bsizes button { flex: 1 0 30%; }
+.st-card .note, .fld .note { font-size: 11px; line-height: 1.4; color: var(--ink2); }

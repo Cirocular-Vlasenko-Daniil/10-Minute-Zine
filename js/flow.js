@@ -1,9 +1,9 @@
 // Вставка целого Markdown-текста: раскладывает его по полосам,
 // подбирая высоту каждого блока и перенося остаток текста на следующую полосу.
 
-import { BLOCKS, mkBlock, pageCount } from './model.js?v=3b9ebbed';
-import { pageLayout, buildBlock } from './layout.js?v=3b9ebbed';
-import { parseBlocks } from './md.js?v=3b9ebbed';
+import { BLOCKS, mkBlock, pageCount } from './model.js?v=15a49f67';
+import { pageLayout, buildBlock } from './layout.js?v=15a49f67';
+import { parseBlocks } from './md.js?v=15a49f67';
 
 const HSIZE = { 1: 'L', 2: 'M', 3: 'S' };
 

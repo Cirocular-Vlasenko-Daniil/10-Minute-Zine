@@ -310,4 +310,12 @@ export const EN = {
   'Открыть файл .zine': 'Open .zine file',
   'Текущий проект будет заменён. Если он нужен — сначала сохраните его в .zine. Продолжить?': 'The current project will be replaced. Save it as .zine first if you need it. Continue?',
   'Установить приложение': 'Install app',
+  'по короткому краю': 'on the short edge',
+  'по длинному краю': 'on the long edge',
+  'Брошюра {f}: печать на {p} с двух сторон, переворот {e} · разрезать по пунктиру на {k} части · сложить части стопкой по порядку — слева направо, сверху вниз, — согнуть и скрепить по сгибу': 'Booklet {f}: print on {p} double-sided, flip {e} · cut along the dotted lines into {k} pieces · stack the pieces in order — left to right, top to bottom — fold and staple along the fold',
+  'Брошюра {f}: печать на {p} с двух сторон, переворот {e} · сложить листы стопкой, согнуть и скрепить по сгибу': 'Booklet {f}: print on {p} double-sided, flip {e} · stack the sheets, fold and staple along the fold',
+  'Размер страницы': 'Page size',
+  'Печать на {p}: {k} разворота на листе, потом разрезать': 'Printed on {p}: {k} spreads per sheet, then cut',
+  'Печать на {p}: один разворот на листе': 'Printed on {p}: one spread per sheet',
+  'Начнём с {n} страниц — добавить можно в редакторе': 'Starts with {n} pages — add more in the editor',
 };

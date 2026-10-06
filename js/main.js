@@ -1,16 +1,16 @@
-import * as M from './model.js?v=3b9ebbed';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=3b9ebbed';
-import { initAnalytics, track } from './analytics.js?v=3b9ebbed';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=3b9ebbed';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=3b9ebbed';
-import { randomPalette } from './palette.js?v=3b9ebbed';
-import { pageSVG, svgInner } from './render.js?v=3b9ebbed';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=3b9ebbed';
-import { pagesZip } from './raster.js?v=3b9ebbed';
-import { buildPDF } from './pdf.js?v=3b9ebbed';
-import { htmlToMd, looksLikeMd } from './md.js?v=3b9ebbed';
-import { flowMarkdown } from './flow.js?v=3b9ebbed';
-import * as store from './store.js?v=3b9ebbed';
+import * as M from './model.js?v=15a49f67';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=15a49f67';
+import { initAnalytics, track } from './analytics.js?v=15a49f67';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=15a49f67';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=15a49f67';
+import { randomPalette } from './palette.js?v=15a49f67';
+import { pageSVG, svgInner } from './render.js?v=15a49f67';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=15a49f67';
+import { pagesZip } from './raster.js?v=15a49f67';
+import { buildPDF } from './pdf.js?v=15a49f67';
+import { htmlToMd, looksLikeMd } from './md.js?v=15a49f67';
+import { flowMarkdown } from './flow.js?v=15a49f67';
+import * as store from './store.js?v=15a49f67';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -117,7 +117,7 @@ function renderTop() {
   const typ = { zine: tr('зин'), poster: tr('постер'), none: tr('пусто') };
   // брошюра — одна «сторона»: вместо A/B — формат и число страниц
   $('#sideTabs').innerHTML = d.sides[0].type === 'booklet'
-    ? `<button data-side="0" class="on">${tr('Брошюра')} · ${M.FORMATS[d.format].booklet.name} · ${tr('{n} стр.', { n: M.pageCount(d, 0) })}</button>`
+    ? `<button data-side="0" class="on">${tr('Брошюра')} · ${M.bookletSize(d).name} · ${tr('{n} стр.', { n: M.pageCount(d, 0) })}</button>`
     : [0, 1].map((i) =>
       `<button data-side="${i}" class="${S.side === i ? 'on' : ''}">${i ? 'B' : 'A'}${isMobile() ? '' : ' · ' + typ[d.sides[i].type]}</button>`).join('');
   document.querySelectorAll('#viewTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === S.view));
@@ -234,25 +234,34 @@ function renderSheet(sf) {
 
 // Брошюра на виде «Лист»: все листы для домашней печати — лицо и оборот рядом, сгиб посередине
 function renderBookletSheets(sf) {
-  const [SW, SH] = M.FORMATS[S.doc.format].sheet, n = M.pageCount(S.doc, S.side);
+  const bp = M.bookletPrint(S.doc), [SW, SH] = bp.size, [pw, ph] = bp.page;
   const r = canvas.getBoundingClientRect();
-  const k = Math.max(0.5, Math.min((r.width - 80) / (SW * 2 + 12), (r.height - 90) / SH)); // два листа в ряд
-  const sides = M.bookletSheets(n).map((s) => {
-    let g = '', slots = '';
-    s.pages.forEach((pi, j) => {
-      const { items } = pageDL(S.doc, S.side, pi);
-      g += `<g transform="translate(${j * sf.w} 0)">${svgInner(items)}</g>`;
-      slots += `<div class="slot" data-goto="${pi}" style="left:${j * 50}%;top:0;width:50%;height:100%"><span>${pi + 1}</span></div>`;
-    });
-    const fold = `<line x1="${sf.w}" y1="0" x2="${sf.w}" y2="${SH}" stroke="#2b2b2b" stroke-width="0.25" stroke-dasharray="2 1"/>`;
+  const k = Math.max(0.5, Math.min((r.width - 80) / (SW * 2 + 12), (r.height - 90) / SH)); // лицо и оборот рядом
+  const pc = (v, of) => (v / of) * 100 + '%';
+  const sides = bp.sheets.map((p) => {
+    let g = '', slots = '', lines = '';
+    for (const c of p.cells) {
+      c.pages.forEach((pi, j) => {
+        const { items } = pageDL(S.doc, S.side, pi), x = c.x + j * pw;
+        g += `<g transform="translate(${x} ${c.y})">${svgInner(items)}</g>`;
+        slots += `<div class="slot" data-goto="${pi}" style="left:${pc(x, SW)};top:${pc(c.y, SH)};width:${pc(pw, SW)};height:${pc(ph, SH)}"><span>${pi + 1}</span></div>`;
+      });
+      lines += `<line x1="${c.x + pw}" y1="${c.y}" x2="${c.x + pw}" y2="${c.y + ph}" stroke="#2b2b2b" stroke-width="0.25" stroke-dasharray="2 1"/>`;
+    }
+    for (let i = 1; i < bp.cols; i++) lines += `<line x1="${i * 2 * pw}" y1="0" x2="${i * 2 * pw}" y2="${SH}" stroke="#9a9a9a" stroke-width="0.25" stroke-dasharray="0.5 1"/>`;
+    for (let i = 1; i < bp.rows; i++) lines += `<line x1="0" y1="${i * ph}" x2="${SW}" y2="${i * ph}" stroke="#9a9a9a" stroke-width="0.25" stroke-dasharray="0.5 1"/>`;
     return `<div class="bsheet"><div class="sheet" style="width:${px(SW * k)}px;height:${px(SH * k)}px;background:${S.doc.paper}">
-      <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${g}${fold}</svg>${slots}</div>
-      <div class="plabel">${tr('Лист {i}', { i: s.sheet + 1 })} · ${s.back ? tr('оборот') : tr('лицо')}</div></div>`;
+      <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${g}${lines}</svg>${slots}</div>
+      <div class="plabel">${tr('Лист {i}', { i: p.phys + 1 })} · ${p.back ? tr('оборот') : tr('лицо')}</div></div>`;
   }).join('');
+  const edge = bp.flip === 'short' ? tr('по короткому краю') : tr('по длинному краю');
+  const note = bp.per > 1
+    ? tr('Брошюра {f}: печать на {p} с двух сторон, переворот {e} · разрезать по пунктиру на {k} части · сложить части стопкой по порядку — слева направо, сверху вниз, — согнуть и скрепить по сгибу',
+      { f: M.bookletSize(S.doc).name, p: bp.paper, e: edge, k: bp.per })
+    : tr('Брошюра {f}: печать на {p} с двух сторон, переворот {e} · сложить листы стопкой, согнуть и скрепить по сгибу', { f: M.bookletSize(S.doc).name, p: bp.paper, e: edge });
   canvas.classList.add('scroll');
   canvas.innerHTML = `<div class="bsheets">${sides}</div>
-    <div class="legend"><div class="keys"><span><i class="d"></i>${tr('сгиб')}</span></div>
-    <div class="note">${tr('Брошюра {f} на листах {s} · печать с двух сторон, переворот по короткому краю · сложить стопкой, согнуть, скрепить по сгибу', { f: M.FORMATS[S.doc.format].booklet.name, s: S.doc.format })}</div></div>`;
+    <div class="legend"><div class="keys"><span><i class="d"></i>${tr('сгиб')}</span>${bp.per > 1 ? `<span><i></i>${tr('разрез')}</span>` : ''}</div><div class="note">${note}</div></div>`;
 }
 
 function thumbHTML(si, pi, h) {
@@ -290,6 +299,14 @@ function sizeRect(f, L, w, h) {
   const b = f.block;
   const r = { x: Math.min(b.x, L.sf.cols - w), y: b.y, w, h };
   return M.canRect(f.page, L.sf, r, b.id) ? r : null;
+}
+
+// Размер страницы брошюры и подсказка, как она печатается
+const bsizeSeg = (attr, cur) => `<div class="seg sm full bsizes">${Object.entries(M.BOOKLET_SIZES).map(([k, b]) =>
+  `<button ${attr}="${k}" class="${k === cur ? 'on' : ''}">${b.name}</button>`).join('')}</div>`;
+function bsizeNote(key) {
+  const b = M.BOOKLET_SIZES[key], per = b.cols * b.rows;
+  return per > 1 ? tr('Печать на {p}: {k} разворота на листе, потом разрезать', { p: b.paper, k: per }) : tr('Печать на {p}: один разворот на листе', { p: b.paper });
 }
 
 // Выбор шрифта: свой список, каждое название написано своим шрифтом (образцы грузятся при открытии)
@@ -524,7 +541,8 @@ function docPanel() {
     ? `<div class="sec"><div class="fld"><label>${tr('Название')}</label><input data-doc-title value="${esc(d.title)}"></div></div>` : '';
   return `${titleSec}${pageSec}
   <div class="sec"><div class="lbl">${tr('Лист')}</div>
-    ${booklet ? `<div class="fld"><label>${tr('Лист для печати')}</label>${seg('data-doc-format', [['A4', 'A4 → A5'], ['A3', 'A3 → A4'], ['Letter', 'Letter → ½']], d.format)}</div>
+    ${booklet ? `<div class="fld"><label>${tr('Размер страницы')}</label>${bsizeSeg('data-doc-bsize', d.booklet)}
+      <div class="note">${bsizeNote(d.booklet)}</div></div>
     <div class="fld"><label>${tr('Страниц')} · ${M.pageCount(d, 0)}</label><div class="btns">
       <button data-act="pagesDel" ${M.pageCount(d, 0) <= M.BOOKLET_PAGES.min ? 'disabled' : ''}>− 4</button>
       <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
@@ -1333,6 +1351,10 @@ insp.addEventListener('click', async (e) => {
     commit(); renderAll(); return;
   }
   if (d.paper) { S.doc.paper = d.paper; commit(); renderAll(); return; }
+  if (d.docBsize) { // брошюра: другой размер страницы — сетка и блоки остаются, меняется масштаб
+    S.doc.booklet = d.docBsize; S.doc.format = M.BOOKLET_SIZES[d.docBsize].paper;
+    commit(); renderAll(); return;
+  }
   if (d.docFormat) { S.doc.format = d.docFormat; }
   else if (d.sideA) { S.doc.sides[0].type = d.sideA; }
   else if (d.sideB) { S.doc.sides[1].type = d.sideB; if (d.sideB === 'none' && S.side === 1) S.side = 0; }
@@ -1560,10 +1582,8 @@ const PIC = {
 };
 function openStart() {
   const d = S.doc, fmt = d?.format || M.blankDoc().format;
-  const pages = [];
-  for (let n = M.BOOKLET_PAGES.min; n <= M.BOOKLET_PAGES.max; n += 4) pages.push(n);
   const what = d && (d.sides[0].type === 'booklet'
-    ? `${tr('брошюра')} ${M.FORMATS[d.format].booklet.name}, ${tr('{n} стр.', { n: M.pageCount(d, 0) })}`
+    ? `${tr('брошюра')} ${M.bookletSize(d).name}, ${tr('{n} стр.', { n: M.pageCount(d, 0) })}`
     : `${tr('зин из листа')} ${d.format}`);
   $('#start').innerHTML = `<div class="st-box">
     <div class="st-head"><span class="logo"><i></i>10 minute zine</span>${d ? `<button data-st-x title="${tr('Закрыть')}">✕</button>` : ''}</div>
@@ -1576,8 +1596,9 @@ function openStart() {
         <button class="primary" data-st-new="sheet">${tr('Создать зин')}</button></div>
       <div class="st-card">${PIC.booklet}<b>${tr('Брошюра на скрепке')}</b>
         <p>${tr('Многостраничное издание: листы складываются пополам и скрепляются по сгибу.')}</p>
-        <div class="fld"><label>${tr('Лист → страница')}</label>${seg('data-st-bfmt', [['A4', 'A4 → A5'], ['A3', 'A3 → A4'], ['Letter', 'Letter → ½']], fmt)}</div>
-        <div class="fld"><label>${tr('Страниц')}</label><select data-st-pages>${pages.map((n) => `<option ${n === M.BOOKLET_PAGES.def ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="fld"><label>${tr('Размер страницы')}</label>${bsizeSeg('data-st-bsize', 'A5')}
+          <div class="note" data-st-bnote>${bsizeNote('A5')}</div></div>
+        <div class="note">${tr('Начнём с {n} страниц — добавить можно в редакторе', { n: M.BOOKLET_PAGES.def })}</div>
         <button class="primary" data-st-new="booklet">${tr('Создать брошюру')}</button></div>
     </div>
     <div class="st-foot"><button data-st-act="sample">${tr('Открыть пример')}</button><button data-st-act="open">${tr('Открыть файл .zine')}</button>
@@ -1593,8 +1614,9 @@ const closeStart = () => { $('#start').hidden = true; $('#start').innerHTML = ''
 $('#start').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  for (const k of ['stFmt', 'stBfmt']) if (b.dataset[k]) { // переключатели внутри карточки
+  for (const k of ['stFmt', 'stBsize']) if (b.dataset[k]) { // переключатели внутри карточки
     b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    if (k === 'stBsize') $('[data-st-bnote]').textContent = bsizeNote(b.dataset.stBsize);
     return;
   }
   if (b.dataset.stX !== undefined) return closeStart();
@@ -1605,8 +1627,8 @@ $('#start').addEventListener('click', async (e) => {
   if (!kind) return;
   if (hasContent(S.doc) && !confirm(tr('Текущий проект будет заменён. Если он нужен — сначала сохраните его в .zine. Продолжить?'))) return;
   const card = b.closest('.st-card');
-  const fmt = card.querySelector('.seg .on').dataset[kind === 'booklet' ? 'stBfmt' : 'stFmt'];
-  const doc = kind === 'booklet' ? M.blankBooklet(fmt, +card.querySelector('[data-st-pages]').value) : { ...M.blankDoc(), format: fmt };
+  const fmt = card.querySelector('.seg .on').dataset[kind === 'booklet' ? 'stBsize' : 'stFmt'];
+  const doc = kind === 'booklet' ? M.blankBooklet(fmt) : { ...M.blankDoc(), format: fmt };
   S.view = 'pages';
   await loadDoc(doc);
   commit(); closeStart();

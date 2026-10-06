@@ -1,6 +1,6 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=3b9ebbed';
+import { t, getLang } from './i18n.js?v=15a49f67';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
@@ -16,8 +16,21 @@ export const FORMATS = {
   Letter: { sheet: [279.4, 215.9], page: [69.85, 107.95], margin: 5, s: 1, poster: { margin: 10, s: 1.6 }, booklet: { margin: 12, s: 1.25, name: '½ Letter' } },
 };
 
-// Брошюра: страниц кратно 4 (на листе 4 страницы — по 2 с каждой стороны)
-export const BOOKLET_PAGES = { min: 8, max: 64, def: 16 };
+// Брошюра: страниц кратно 4 (на листе брошюры 4 страницы — по 2 с каждой стороны)
+export const BOOKLET_PAGES = { min: 8, max: 64, def: 8 };
+
+// Брошюра: размер страницы и как развороты ложатся на печатный лист (cols × rows разворотов).
+// Больше одного разворота — после печати лист режется на части, каждая — лист брошюры.
+// A4/A5 — разворот во весь лист A3/A4; A6 — два на A4 (книжный), A7 — четыре на A4 (альбомный).
+export const BOOKLET_SIZES = {
+  A4: { name: 'A4', page: [210, 297], paper: 'A3', cols: 1, rows: 1, margin: 15, s: 1.45 },
+  A5: { name: 'A5', page: [148.5, 210], paper: 'A4', cols: 1, rows: 1, margin: 12, s: 1.25 },
+  A6: { name: 'A6', page: [105, 148.5], paper: 'A4', cols: 1, rows: 2, margin: 8, s: 1.1 },
+  A7: { name: 'A7', page: [74.25, 105], paper: 'A4', cols: 2, rows: 2, margin: 6, s: 1 },
+  HL: { name: '½ Letter', page: [139.7, 215.9], paper: 'Letter', cols: 1, rows: 1, margin: 12, s: 1.25 },
+  QL: { name: '¼ Letter', page: [107.95, 139.7], paper: 'Letter', cols: 1, rows: 2, margin: 8, s: 1.1 },
+};
+export const bookletSize = (doc) => BOOKLET_SIZES[doc.booklet] || BOOKLET_SIZES.A5;
 
 // Импозиция 8-полосного зина на альбомном листе 4×2:
 // [индекс полосы, колонка, ряд, повёрнута на 180°]
@@ -217,9 +230,10 @@ export function blankDoc() {
 }
 
 // Новая брошюра на скрепке: n страниц (кратно 4), лист format складывается пополам
-export function blankBooklet(format, n = BOOKLET_PAGES.def) {
+export function blankBooklet(size, n = BOOKLET_PAGES.def) {
   const d = blankDoc();
-  d.format = format;
+  d.booklet = size;
+  d.format = BOOKLET_SIZES[size].paper; // формат бумаги — для зина, если переключиться обратно
   d.sides[0] = { ...mkSide('booklet'), pages: Array.from({ length: n }, () => ({ blocks: [] })) };
   return d;
 }
@@ -257,6 +271,8 @@ export function normalize(d) {
     if (s.coverBg) { s.spreadBg[7] ||= s.coverBg; delete s.coverBg; }
     return s;
   });
+  // ранние бета-брошюры: размер задавался листом (A4 → A5, A3 → A4, Letter → ½ Letter)
+  if (doc.sides[0].type === 'booklet' && !BOOKLET_SIZES[doc.booklet]) doc.booklet = { A4: 'A5', A3: 'A4', Letter: 'HL' }[doc.format] || 'A5';
   return doc;
 }
 
@@ -285,7 +301,7 @@ export function surface(doc, si) {
     const [w, h] = side.poster.orient === 'landscape' ? [a, b] : [b, a];
     return { kind: 'poster', w, h, margin: F.poster.margin, s: F.poster.s };
   }
-  if (side.type === 'booklet') return { kind: 'booklet', w: F.sheet[0] / 2, h: F.sheet[1], margin: F.booklet.margin, s: F.booklet.s };
+  if (side.type === 'booklet') { const b = bookletSize(doc); return { kind: 'booklet', w: b.page[0], h: b.page[1], margin: b.margin, s: b.s }; }
   return { kind: 'zine', w: F.page[0], h: F.page[1], margin: F.margin, s: F.s };
 }
 
@@ -339,6 +355,25 @@ export function spreads(doc, si) {
 // Брошюра: раскладка на листы для домашней печати (двусторонней, переворот по короткому краю).
 // Лист i: лицо — [n−1−2i | 2i], оборот — [2i+1 | n−2−2i]. Сложенные стопкой и сшитые по сгибу,
 // листы дают страницы по порядку.
+// Печатные листы брошюры для дома: на стороне листа — cols × rows разворотов (листов брошюры).
+// Оборот зеркалится по горизонтали: при двусторонней печати лист переворачивается вокруг
+// вертикальной оси (альбомный — по короткому краю, книжный — по длинному).
+export function bookletPrint(doc) {
+  const b = bookletSize(doc), n = pageCount(doc, 0), [pw, ph] = b.page;
+  const SW = b.cols * 2 * pw, SH = b.rows * ph, per = b.cols * b.rows;
+  const bs = bookletSheets(n), count = n / 4, out = [];
+  for (let j = 0; j < Math.ceil(count / per); j++) for (const back of [false, true]) {
+    const cells = [];
+    for (let k = 0; k < per && j * per + k < count; k++) {
+      const i = j * per + k, c = k % b.cols, r = Math.floor(k / b.cols);
+      const x = back ? SW - (c + 1) * 2 * pw : c * 2 * pw;
+      cells.push({ sheet: i, x, y: r * ph, pages: bs[i * 2 + (back ? 1 : 0)].pages });
+    }
+    out.push({ phys: j, back, cells });
+  }
+  return { sheets: out, size: [SW, SH], page: [pw, ph], per, cols: b.cols, rows: b.rows, flip: SW > SH ? 'short' : 'long', paper: b.paper };
+}
+
 export function bookletSheets(n) {
   const out = [];
   for (let i = 0; i < n / 4; i++) {

@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface, pageCount, bookletSheets } from './model.js?v=3b9ebbed';
-import { pageDL } from './layout.js?v=3b9ebbed';
-import { fontBytes, glyphPath } from './fonts.js?v=3b9ebbed';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=3b9ebbed';
+import { FORMATS, IMPOSITION, surface, pageCount, bookletPrint } from './model.js?v=15a49f67';
+import { pageDL } from './layout.js?v=15a49f67';
+import { fontBytes, glyphPath } from './fonts.js?v=15a49f67';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=15a49f67';
 
 const K = 72 / 25.4;
 
@@ -58,7 +58,11 @@ export async function buildPDF(doc, o) {
       const n = pageCount(doc, si);
       sheets = press
         ? Array.from({ length: n }, (_, pi) => ({ size: [sf.w, sf.h], slots: [{ pi, x: 0, y: 0, rot: 0, edge: all }] }))
-        : bookletSheets(n).map((b) => ({ size: F.sheet, slots: b.pages.map((pi, j) => ({ pi, x: j * sf.w, y: 0, rot: 0, edge: { top: true, bottom: true, left: j === 0, right: j === 1 } })) }));
+        : (() => { // дома: листы для двусторонней печати, на листе — один или несколько разворотов
+          const bp = bookletPrint(doc);
+          return bp.sheets.map((p) => ({ size: bp.size, bp, cells: p.cells,
+            slots: p.cells.flatMap((c) => c.pages.map((pi, j) => ({ pi, x: c.x + j * sf.w, y: c.y, rot: 0, edge: all }))) }));
+        })();
     } else if (side.type === 'poster') sheets = [{ size: [sf.w, sf.h], slots: [{ pi: 0, x: 0, y: 0, rot: 0 }] }];
     else sheets = [{ size: F.sheet, slots: IMPOSITION.map(([pi, c, r, rot]) => ({ pi, x: c * sf.w, y: r * sf.h, rot, edge: { top: r === 0, bottom: r === 1, left: c === 0, right: c === 3 } })) }];
     for (const sheet of sheets) {
@@ -157,10 +161,15 @@ export async function buildPDF(doc, o) {
         L(-a, SH / 2, -b, SH / 2, t, c, d); L(SW + a, SH / 2, SW + b, SH / 2, t, c, d);
       }
     }
-    // брошюра дома: метки сгиба посередине листа, сверху и снизу
-    if (side.type === 'booklet' && !press && o.guides) {
-      const c = rgb(0.72, 0.72, 0.72);
-      L(sf.w, SH, sf.w, SH - 3, 0.15, c); L(sf.w, 0, sf.w, 3, 0.15, c);
+    // брошюра дома: метки сгиба у каждого разворота, пунктир разреза между разворотами
+    if (sheet.bp && o.guides) {
+      const c = rgb(0.72, 0.72, 0.72), { cols, rows, page: [pw, ph] } = sheet.bp;
+      for (const cell of sheet.cells) {
+        const fx = cell.x + pw, top = SH - cell.y, bot = SH - cell.y - ph; // в мм от низа листа
+        L(fx, top, fx, top - 3, 0.15, c); L(fx, bot, fx, bot + 3, 0.15, c);
+      }
+      for (let i = 1; i < cols; i++) L(i * 2 * pw, 0, i * 2 * pw, SH, 0.15, c, [1.2, 1]);
+      for (let i = 1; i < rows; i++) L(0, SH - i * ph, SW, SH - i * ph, 0.15, c, [1.2, 1]);
     }
     }
   }
