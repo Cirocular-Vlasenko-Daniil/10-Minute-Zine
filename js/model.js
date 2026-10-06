@@ -1,6 +1,6 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=0a43975c';
+import { t, getLang } from './i18n.js?v=fa55acfe';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
