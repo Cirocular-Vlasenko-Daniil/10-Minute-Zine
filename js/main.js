@@ -1,16 +1,16 @@
-import * as M from './model.js?v=68a2e7d2';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=68a2e7d2';
-import { initAnalytics, track } from './analytics.js?v=68a2e7d2';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=68a2e7d2';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=68a2e7d2';
-import { randomPalette } from './palette.js?v=68a2e7d2';
-import { pageSVG, svgInner } from './render.js?v=68a2e7d2';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=68a2e7d2';
-import { pagesZip } from './raster.js?v=68a2e7d2';
-import { buildPDF } from './pdf.js?v=68a2e7d2';
-import { htmlToMd, looksLikeMd } from './md.js?v=68a2e7d2';
-import { flowMarkdown } from './flow.js?v=68a2e7d2';
-import * as store from './store.js?v=68a2e7d2';
+import * as M from './model.js?v=8c4ccd23';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=8c4ccd23';
+import { initAnalytics, track } from './analytics.js?v=8c4ccd23';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=8c4ccd23';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=8c4ccd23';
+import { randomPalette } from './palette.js?v=8c4ccd23';
+import { pageSVG, svgInner } from './render.js?v=8c4ccd23';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=8c4ccd23';
+import { pagesZip } from './raster.js?v=8c4ccd23';
+import { buildPDF } from './pdf.js?v=8c4ccd23';
+import { htmlToMd, looksLikeMd } from './md.js?v=8c4ccd23';
+import { flowMarkdown } from './flow.js?v=8c4ccd23';
+import * as store from './store.js?v=8c4ccd23';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -115,8 +115,11 @@ function renderTop() {
   const d = S.doc;
   if (document.activeElement !== $('#title')) $('#title').value = d.title;
   const typ = { zine: tr('зин'), poster: tr('постер'), none: tr('пусто') };
-  $('#sideTabs').innerHTML = [0, 1].map((i) =>
-    `<button data-side="${i}" class="${S.side === i ? 'on' : ''}">${i ? 'B' : 'A'}${isMobile() ? '' : ' · ' + typ[d.sides[i].type]}</button>`).join('');
+  // брошюра — одна «сторона»: вместо A/B — формат и число страниц
+  $('#sideTabs').innerHTML = d.sides[0].type === 'booklet'
+    ? `<button data-side="0" class="on">${tr('Брошюра')} · ${M.FORMATS[d.format].booklet.name} · ${tr('{n} стр.', { n: M.pageCount(d, 0) })}</button>`
+    : [0, 1].map((i) =>
+      `<button data-side="${i}" class="${S.side === i ? 'on' : ''}">${i ? 'B' : 'A'}${isMobile() ? '' : ' · ' + typ[d.sides[i].type]}</button>`).join('');
   document.querySelectorAll('#viewTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === S.view));
   updateUndo();
 }
@@ -185,6 +188,7 @@ function fitScale(w, h, padX = isMobile() ? 24 : 64, padY = isMobile() ? 44 : 90
 }
 
 function renderStage() {
+  canvas.classList.remove('scroll');
   const sd = side();
   if (sd.type === 'none') {
     canvas.innerHTML = `<div class="empty"><div>${tr('Оборот листа пустой.')}</div><div class="btns">
@@ -209,6 +213,7 @@ function renderSheet(sf) {
       <div class="slot" data-goto="0" style="inset:0"></div></div><div class="legend" style="max-width:${sf.w * k}px"><div class="note">${tr('Постер · {f} · так он уйдёт в печать', { f: S.doc.format })}</div></div></div>`;
     return;
   }
+  if (sd.type === 'booklet') return renderBookletSheets(sf);
   const [SW, SH] = M.FORMATS[S.doc.format].sheet;
   const k = fitScale(SW, SH);
   let g = '', slots = '';
@@ -225,6 +230,29 @@ function renderSheet(sf) {
   canvas.innerHTML = `<div class="sheetwrap"><div class="sheet" style="width:${px(SW * k)}px;height:${px(SH * k)}px;background:${S.doc.paper}">
     <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${g}${lines}</svg>${slots}</div>
     <div class="legend" style="max-width:${SW * k}px"><div class="keys"><span><i></i>${tr('разрез')}</span><span><i class="d"></i>${tr('сгибы')}</span></div><div class="note">${tr('Лист {f} · верхний ряд печатается вверх ногами — так и нужно', { f: S.doc.format })}</div></div></div>`;
+}
+
+// Брошюра на виде «Лист»: все листы для домашней печати — лицо и оборот рядом, сгиб посередине
+function renderBookletSheets(sf) {
+  const [SW, SH] = M.FORMATS[S.doc.format].sheet, n = M.pageCount(S.doc, S.side);
+  const r = canvas.getBoundingClientRect();
+  const k = Math.max(0.5, Math.min((r.width - 80) / (SW * 2 + 12), (r.height - 90) / SH)); // два листа в ряд
+  const sides = M.bookletSheets(n).map((s) => {
+    let g = '', slots = '';
+    s.pages.forEach((pi, j) => {
+      const { items } = pageDL(S.doc, S.side, pi);
+      g += `<g transform="translate(${j * sf.w} 0)">${svgInner(items)}</g>`;
+      slots += `<div class="slot" data-goto="${pi}" style="left:${j * 50}%;top:0;width:50%;height:100%"><span>${pi + 1}</span></div>`;
+    });
+    const fold = `<line x1="${sf.w}" y1="0" x2="${sf.w}" y2="${SH}" stroke="#2b2b2b" stroke-width="0.25" stroke-dasharray="2 1"/>`;
+    return `<div class="bsheet"><div class="sheet" style="width:${px(SW * k)}px;height:${px(SH * k)}px;background:${S.doc.paper}">
+      <svg viewBox="0 0 ${SW} ${SH}" preserveAspectRatio="none" xml:space="preserve"><rect width="${SW}" height="${SH}" fill="${S.doc.paper}"/>${g}${fold}</svg>${slots}</div>
+      <div class="plabel">${tr('Лист {i}', { i: s.sheet + 1 })} · ${s.back ? tr('оборот') : tr('лицо')}</div></div>`;
+  }).join('');
+  canvas.classList.add('scroll');
+  canvas.innerHTML = `<div class="bsheets">${sides}</div>
+    <div class="legend"><div class="keys"><span><i class="d"></i>${tr('сгиб')}</span></div>
+    <div class="note">${tr('Брошюра {f} на листах {s} · печать с двух сторон, переворот по короткому краю · сложить стопкой, согнуть, скрепить по сгибу', { f: M.FORMATS[S.doc.format].booklet.name, s: S.doc.format })}</div></div>`;
 }
 
 function thumbHTML(si, pi, h) {
@@ -454,7 +482,7 @@ function docPanel() {
       const v = `${c}x${r}`;
       return `<option value="${v}" ${v === cur ? 'selected' : ''}>${c} × ${r}</option>`;
     }).join('');
-    const joined = M.coversJoined(d, S.side), cover = kind === 'zine' && M.isCover(S.page);
+    const joined = M.coversJoined(d, S.side), cover = kind !== 'poster' && M.isCover(d, S.side, S.page);
     const host = bgHost(), pair = M.pairOf(d, S.side, S.page);
     const bg = curBg() || {};
     const hasBg = bg.asset && assets[bg.asset];
@@ -465,7 +493,7 @@ function docPanel() {
     pageSec = `<div class="sec"><div class="ihead"><b>${M.pageLabel(d, S.side, S.page)}</b></div>
       <div class="btns"><button data-act="clearPage" ${L.boxes.length ? '' : 'disabled'}>${L.pair ? tr('Очистить разворот') : tr('Очистить страницу')}</button></div></div>
     <div class="sec"><div class="fld"><label>${tr('Сетка')}</label><select data-grid>${grids}</select></div>
-      ${kind === 'zine' ? `<div class="btns"><button data-act="gridAll">${tr('Применить ко всем страницам')}</button></div>` : ''}
+      ${kind !== 'poster' ? `<div class="btns"><button data-act="gridAll">${tr('Применить ко всем страницам')}</button></div>` : ''}
       ${M.pairOf(d, S.side, S.page) ? `<div class="fld"><label>${tr('Сетка разворота')}</label>${seg('data-spread-grid', [[0, tr('По страницам')], [1, tr('Общая')]], L.pair ? 1 : 0)}</div>
       ${L.pair ? `<div class="hint">${tr('Блоки можно тянуть через корешок — например, картинку на весь разворот. Текст на сгибе читается плохо, лучше оставлять его на одной странице.')}</div>` : ''}` : ''}</div>
     ${cover ? `<div class="sec"><div class="fld"><label>${tr('Обложки')}</label>${seg('data-join-covers', [[0, tr('Отдельно')], [1, tr('Вместе')]], joined ? 1 : 0)}</div>
@@ -488,6 +516,7 @@ function docPanel() {
       : ''}</div>`;
   }
   const anyPoster = d.sides.some((s) => s.type === 'poster');
+  const booklet = d.sides[0].type === 'booklet';
   const hf = d.hf;
   const hfRow = (k) => `<div class="row2">${['left', 'center', 'right'].map((p) =>
     `<input data-hf="${k}.${p}" value="${esc(hf[k][p])}" placeholder="${{ left: tr('слева'), center: tr('центр'), right: tr('справа') }[p]}" title="${tr('{n} номер · {nn} 01 · {N} всего · {title} название')}" ${hf[k].on ? '' : 'disabled'}>`).join('')}</div>`;
@@ -495,9 +524,14 @@ function docPanel() {
     ? `<div class="sec"><div class="fld"><label>${tr('Название')}</label><input data-doc-title value="${esc(d.title)}"></div></div>` : '';
   return `${titleSec}${pageSec}
   <div class="sec"><div class="lbl">${tr('Лист')}</div>
-    <div class="fld"><label>${tr('Формат')}</label>${seg('data-doc-format', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], d.format)}</div>
+    ${booklet ? `<div class="fld"><label>${tr('Лист для печати')}</label>${seg('data-doc-format', [['A4', 'A4 → A5'], ['A3', 'A3 → A4'], ['Letter', 'Letter → ½']], d.format)}</div>
+    <div class="fld"><label>${tr('Страниц')} · ${M.pageCount(d, 0)}</label><div class="btns">
+      <button data-act="pagesDel" ${M.pageCount(d, 0) <= M.BOOKLET_PAGES.min ? 'disabled' : ''}>− 4</button>
+      <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
+      <div class="note">${tr('Новые страницы встают перед задней обложкой, при уменьшении убираются последние внутренние')}</div></div>`
+    : `<div class="fld"><label>${tr('Формат')}</label>${seg('data-doc-format', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], d.format)}</div>
     <div class="fld"><label>${tr('Сторона A')}</label>${seg('data-side-a', [['zine', tr('Зин')], ['poster', tr('Постер')]], d.sides[0].type)}</div>
-    <div class="fld"><label>${tr('Сторона B')}</label>${seg('data-side-b', [['none', tr('Пусто')], ['poster', tr('Постер')], ['zine', tr('Зин')]], d.sides[1].type)}</div>
+    <div class="fld"><label>${tr('Сторона B')}</label>${seg('data-side-b', [['none', tr('Пусто')], ['poster', tr('Постер')], ['zine', tr('Зин')]], d.sides[1].type)}</div>`}
     <div class="btns"><button data-act="randPalette" title="${tr('Бумага и три краски по правилам колористики')}">${tr('Случайная палитра')}</button></div>
     ${['ink', 'accent', 'meta'].map((k) => {
       const cur = d.colors[k].toLowerCase();
@@ -683,6 +717,15 @@ function act(a, el) {
       if (box) Object.assign(f.block, { zoom: +containZoom(f.block.asset, f.block.rot, box.w, box.h).toFixed(4), px: 0.5, py: 0.5 });
       commit(); renderAll();
     } break;
+    case 'pagesAdd': case 'pagesDel': {
+      const n = M.pageCount(S.doc, 0) + (a === 'pagesAdd' ? 4 : -4);
+      if (a === 'pagesDel') {
+        const s0 = S.doc.sides[0], gone = s0.pages.slice(n - 2, -1); // убираемые внутренние страницы
+        if (gone.some((p) => p.blocks.length || p.bg) && !confirm(tr('На убираемых страницах есть содержимое — удалить его?'))) break;
+      }
+      M.setBookletPages(S.doc, n);
+      fixPos(); commit(); renderAll();
+    } break;
     case 'fitQr': if (f?.block.qrimg) { f.block.qrzoom = +containZoom(f.block.qrimg, 0, 1, 1).toFixed(4); commit(); renderAll(); } break;
     case 'fitBg': { const bg = curBg(), box = bgBox(); if (bg) { Object.assign(bg, { zoom: +containZoom(bg.asset, bg.rot, box.w, box.h).toFixed(4), px: 0.5, py: 0.5 }); commit(); renderAll(); } } break;
     case 'rotImg': if (f) { f.block.rot = ((f.block.rot || 0) + 90) % 360; commit(); renderAll(); } break;
@@ -714,7 +757,7 @@ function act(a, el) {
     case 'rmImg': if (f) { f.block.asset = null; commit(); renderAll(); } break;
     case 'clearPage': M.getPage(S.doc, S.side, (M.spreadGridOf(S.doc, S.side, S.page) || [S.page])[0]).blocks = []; S.sel = null; commit(); renderAll(); break;
     case 'setB': S.doc.sides[1].type = el.dataset.val; commit(); renderAll(); break;
-    case 'new': if (confirm(tr('Начать новый пустой зин? Текущий будет заменён.'))) { S.doc = M.blankDoc(); S.sel = null; S.side = 0; S.page = 0; commit(); renderAll(); } break;
+    case 'new': openStart(); break; // выбор формата: зин из листа или брошюра
     case 'sample': if (confirm(tr('Загрузить пример? Текущий зин будет заменён.'))) loadSample(); break;
     case 'open': $('#fileZine').click(); break;
     case 'save': saveZine(); break;
@@ -1276,7 +1319,8 @@ insp.addEventListener('click', async (e) => {
   if (d.joinCovers !== undefined) {
     const on = d.joinCovers === '1';
     // обложки врозь — сначала разбираем их общую сетку
-    if (!on && M.spreadGridOf(S.doc, S.side, 7) && !splitGrid([7, 0])) return;
+    const last = M.lastPage(S.doc, S.side);
+    if (!on && M.spreadGridOf(S.doc, S.side, last) && !splitGrid([last, 0])) return;
     side().joinCovers = on;
     commit(); renderAll(); return;
   }
@@ -1350,7 +1394,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     nudge({ ArrowLeft: -1, ArrowRight: 1 }[e.key] || 0, { ArrowUp: -1, ArrowDown: 1 }[e.key] || 0);
   }
-  else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && side().type === 'zine') {
+  else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && M.isPaged(S.doc, S.side)) {
     const s = spreadOf(S.page) + (e.key === 'ArrowLeft' ? -1 : 1);
     const sp = M.spreads(S.doc, S.side);
     if (s >= 0 && s < sp.length) { S.page = sp[s][0]; S.sel = null; renderAll(); }
@@ -1500,6 +1544,69 @@ async function loadSample() {
   commit();
 }
 
+// ---------- стартовый экран: продолжить или новый проект нужного формата ----------
+const hasContent = (doc) => !!doc && doc.sides.some((s) =>
+  (s.pages || []).some((p) => p.blocks.length || p.bg) || s.poster?.blocks.length);
+const PIC = {
+  // пиксельные схемы: лист 4×2 с надрезом и сложенная брошюра со скрепками
+  sheet: `<svg viewBox="0 0 40 22" shape-rendering="crispEdges"><rect x="0.5" y="0.5" width="39" height="21" fill="#fff" stroke="#2b2b2b"/>
+    ${[10, 20, 30].map((x) => `<line x1="${x}" y1="1" x2="${x}" y2="21" stroke="#9a9a9a" stroke-dasharray="1 1"/>`).join('')}
+    <line x1="1" y1="11" x2="10" y2="11" stroke="#9a9a9a" stroke-dasharray="1 1"/><line x1="30" y1="11" x2="39" y2="11" stroke="#9a9a9a" stroke-dasharray="1 1"/>
+    <line x1="10" y1="11" x2="30" y2="11" stroke="#2b2b2b"/></svg>`,
+  booklet: `<svg viewBox="0 0 40 22" shape-rendering="crispEdges"><rect x="4.5" y="0.5" width="31" height="21" fill="#fff" stroke="#2b2b2b"/>
+    <rect x="6.5" y="2.5" width="11" height="17" fill="#e8e8e8"/><rect x="22.5" y="2.5" width="11" height="17" fill="#e8e8e8"/>
+    <line x1="20" y1="1" x2="20" y2="21" stroke="#2b2b2b" stroke-dasharray="1 1"/>
+    <rect x="19" y="5" width="2" height="3" fill="#2b2b2b"/><rect x="19" y="14" width="2" height="3" fill="#2b2b2b"/></svg>`,
+};
+function openStart() {
+  const d = S.doc, fmt = d?.format || M.blankDoc().format;
+  const pages = [];
+  for (let n = M.BOOKLET_PAGES.min; n <= M.BOOKLET_PAGES.max; n += 4) pages.push(n);
+  const what = d && (d.sides[0].type === 'booklet'
+    ? `${tr('брошюра')} ${M.FORMATS[d.format].booklet.name}, ${tr('{n} стр.', { n: M.pageCount(d, 0) })}`
+    : `${tr('зин из листа')} ${d.format}`);
+  $('#start').innerHTML = `<div class="st-box">
+    <div class="st-head"><span class="logo"><i></i>10 minute zine</span>${d ? `<button data-st-x title="${tr('Закрыть')}">✕</button>` : ''}</div>
+    ${hasContent(d) ? `<button class="st-cont" data-st-x><b>${tr('Продолжить')}</b><span>${esc(d.title)} · ${what}</span></button>` : ''}
+    <div class="st-cap">${tr('Новый проект')}</div>
+    <div class="st-cards">
+      <div class="st-card">${PIC.sheet}<b>${tr('Зин из одного листа')}</b>
+        <p>${tr('8 страниц на одном листе: распечатать, сложить, сделать один надрез. Можно добавить постер на обороте.')}</p>
+        <div class="fld"><label>${tr('Лист')}</label>${seg('data-st-fmt', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], fmt)}</div>
+        <button class="primary" data-st-new="sheet">${tr('Создать зин')}</button></div>
+      <div class="st-card">${PIC.booklet}<b>${tr('Брошюра на скрепке')}</b>
+        <p>${tr('Многостраничное издание: листы складываются пополам и скрепляются по сгибу.')}</p>
+        <div class="fld"><label>${tr('Лист → страница')}</label>${seg('data-st-bfmt', [['A4', 'A4 → A5'], ['A3', 'A3 → A4'], ['Letter', 'Letter → ½']], fmt)}</div>
+        <div class="fld"><label>${tr('Страниц')}</label><select data-st-pages>${pages.map((n) => `<option ${n === M.BOOKLET_PAGES.def ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <button class="primary" data-st-new="booklet">${tr('Создать брошюру')}</button></div>
+    </div>
+    <div class="st-foot"><button data-st-act="sample">${tr('Открыть пример')}</button><button data-st-act="open">${tr('Открыть файл .zine')}</button></div>
+  </div>`;
+  $('#start').hidden = false;
+}
+const closeStart = () => { $('#start').hidden = true; $('#start').innerHTML = ''; };
+$('#start').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  for (const k of ['stFmt', 'stBfmt']) if (b.dataset[k]) { // переключатели внутри карточки
+    b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    return;
+  }
+  if (b.dataset.stX !== undefined) return closeStart();
+  if (b.dataset.stAct === 'sample') { closeStart(); return loadSample(); }
+  if (b.dataset.stAct === 'open') { closeStart(); return $('#fileZine').click(); }
+  const kind = b.dataset.stNew;
+  if (!kind) return;
+  if (hasContent(S.doc) && !confirm(tr('Текущий проект будет заменён. Если он нужен — сначала сохраните его в .zine. Продолжить?'))) return;
+  const card = b.closest('.st-card');
+  const fmt = card.querySelector('.seg .on').dataset[kind === 'booklet' ? 'stBfmt' : 'stFmt'];
+  const doc = kind === 'booklet' ? M.blankBooklet(fmt, +card.querySelector('[data-st-pages]').value) : { ...M.blankDoc(), format: fmt };
+  S.view = 'pages';
+  await loadDoc(doc);
+  commit(); closeStart();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#start').hidden && S.doc) closeStart(); });
+
 setOnReady(() => renderView());
 
 initAnalytics();
@@ -1516,4 +1623,6 @@ initAnalytics();
   } else {
     await loadSample();
   }
+  // при запуске — выбор: продолжить или новый проект (для скриншотов и встраивания — ?nostart)
+  if (!/[?&]nostart\b/.test(location.search)) openStart();
 })();

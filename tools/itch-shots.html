@@ -9,7 +9,7 @@
   // интерфейс и пример — английские; профиль браузера свежий, поэтому грузится пример
   try { localStorage.setItem('zine-lang', new URLSearchParams(location.search).get('lang') || 'en'); } catch (e) {}
 </script>
-<iframe id="f" src="/editor.html"></iframe>
+<iframe id="f" src="/editor.html?nostart"></iframe>
 <script>
 const shot = new URLSearchParams(location.search).get('shot') || 'editor';
 const f = document.getElementById('f');

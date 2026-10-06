@@ -1,18 +1,23 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=68a2e7d2';
+import { t, getLang } from './i18n.js?v=8c4ccd23';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
 // page — размер полосы зина (1/8 листа), margin — поля полосы.
 // 5 мм на A4 — с запасом под непропечатываемый край лазерного принтера (~4.2 мм).
 // s — множитель типографской шкалы.
+// booklet — брошюра на скрепке: лист складывается пополам, страница — его половина
+// (A4 -> A5, A3 -> A4, Letter -> ½ Letter); поля шире — до скрепки и обреза
 export const FORMATS = {
-  A4: { sheet: [297, 210], page: [74.25, 105], margin: 5, s: 1, poster: { margin: 10, s: 1.6 } },
-  A3: { sheet: [420, 297], page: [105, 148.5], margin: 7, s: 1.3, poster: { margin: 14, s: 2.1 } },
+  A4: { sheet: [297, 210], page: [74.25, 105], margin: 5, s: 1, poster: { margin: 10, s: 1.6 }, booklet: { margin: 12, s: 1.25, name: 'A5' } },
+  A3: { sheet: [420, 297], page: [105, 148.5], margin: 7, s: 1.3, poster: { margin: 14, s: 2.1 }, booklet: { margin: 15, s: 1.45, name: 'A4' } },
   // US Letter 8.5×11": в США и Канаде печатают на нём, а не на A4
-  Letter: { sheet: [279.4, 215.9], page: [69.85, 107.95], margin: 5, s: 1, poster: { margin: 10, s: 1.6 } },
+  Letter: { sheet: [279.4, 215.9], page: [69.85, 107.95], margin: 5, s: 1, poster: { margin: 10, s: 1.6 }, booklet: { margin: 12, s: 1.25, name: '½ Letter' } },
 };
+
+// Брошюра: страниц кратно 4 (на листе 4 страницы — по 2 с каждой стороны)
+export const BOOKLET_PAGES = { min: 8, max: 64, def: 16 };
 
 // Импозиция 8-полосного зина на альбомном листе 4×2:
 // [индекс полосы, колонка, ряд, повёрнута на 180°]
@@ -30,9 +35,10 @@ export const SPREADS_JOINED = [[7, 0], [1, 2], [3, 4], [5, 6]];
 // Сетки [колонки, ряды]; первая в списке после стандарта — по возрастанию плотности
 export const GRIDS = {
   zine: [[2, 3], [2, 4], [3, 4], [3, 6], [4, 4], [4, 6], [3, 8], [4, 8], [3, 10], [4, 10]],
+  booklet: [[2, 4], [3, 6], [4, 6], [4, 8], [3, 10], [4, 10], [6, 10], [6, 12]],
   poster: [[2, 4], [3, 6], [3, 8], [4, 8], [3, 10], [4, 10], [6, 8]],
 };
-export const GRID_DEF = { zine: [3, 6], poster: [3, 8] };
+export const GRID_DEF = { zine: [3, 6], poster: [3, 8], booklet: [4, 8] };
 
 // Кегль подстраивается под плотность сетки: реже сетка — крупнее шрифт.
 // Нижняя граница 0.9 — основной текст на A7 не мельче ~7.2 pt.
@@ -210,6 +216,24 @@ export function blankDoc() {
   };
 }
 
+// Новая брошюра на скрепке: n страниц (кратно 4), лист format складывается пополам
+export function blankBooklet(format, n = BOOKLET_PAGES.def) {
+  const d = blankDoc();
+  d.format = format;
+  d.sides[0] = { ...mkSide('booklet'), pages: Array.from({ length: n }, () => ({ blocks: [] })) };
+  return d;
+}
+
+// Брошюра: перестроить число страниц (новые встают перед задней обложкой, лишние — с конца, кроме неё)
+export function setBookletPages(doc, n) {
+  const s = doc.sides[0], last = s.pages[s.pages.length - 1];
+  const inner = s.pages.slice(1, -1);
+  while (inner.length < n - 2) inner.push({ blocks: [] });
+  inner.length = n - 2;
+  s.pages = [s.pages[0], ...inner, last];
+  s.spreadBg = {}; s.spreadGrid = {}; // развороты сдвинулись — общие фоны и сетки сбрасываем
+}
+
 // Дописывает недостающие поля (старые сохранения, импорт)
 export function normalize(d) {
   const b = blankDoc();
@@ -222,7 +246,9 @@ export function normalize(d) {
   delete doc.hf.color;
   doc.sides = [0, 1].map((i) => {
     const s = { ...b.sides[i], ...(d.sides?.[i] || {}) };
-    s.pages = Array.from({ length: 8 }, (_, k) => s.pages?.[k] || { blocks: [] });
+    // у зина всегда 8 страниц, у брошюры — сколько сохранено (кратно 4)
+    const n = s.type === 'booklet' ? Math.max(BOOKLET_PAGES.min, Math.ceil((s.pages?.length || 0) / 4) * 4) : 8;
+    s.pages = Array.from({ length: n }, (_, k) => s.pages?.[k] || { blocks: [] });
     s.poster = { orient: 'portrait', blocks: [], ...(s.poster || {}) };
     [...s.pages, s.poster].forEach(migratePage);
     // общий фон обложек раньше лежал в coverBg — теперь это фон разворота 8–1
@@ -259,6 +285,7 @@ export function surface(doc, si) {
     const [w, h] = side.poster.orient === 'landscape' ? [a, b] : [b, a];
     return { kind: 'poster', w, h, margin: F.poster.margin, s: F.poster.s };
   }
+  if (side.type === 'booklet') return { kind: 'booklet', w: F.sheet[0] / 2, h: F.sheet[1], margin: F.booklet.margin, s: F.booklet.s };
   return { kind: 'zine', w: F.page[0], h: F.page[1], margin: F.margin, s: F.s };
 }
 
@@ -267,7 +294,7 @@ export function pageSf(doc, si, pi) {
   const base = surface(doc, si);
   const [cols, rows] = getPage(doc, si, pi).grid || GRID_DEF[base.kind];
   const cells = cols * rows;
-  const maxBlocks = base.kind === 'zine' ? Math.max(4, Math.ceil(cells / 3)) : Math.max(6, Math.ceil(cells / 2));
+  const maxBlocks = base.kind === 'poster' ? Math.max(6, Math.ceil(cells / 2)) : Math.max(base.kind === 'booklet' ? 6 : 4, Math.ceil(cells / 3));
   return { ...base, cols, rows, maxBlocks, k: typeK(base.kind, cols, rows) };
 }
 
@@ -294,16 +321,38 @@ export function remapGrid(page, from, to) {
 export const getPage = (doc, si, pi) =>
   doc.sides[si].type === 'poster' ? doc.sides[si].poster : doc.sides[si].pages[pi];
 
-// Обложки показаны разворотом (только у зина)
-export const coversJoined = (doc, si) => doc.sides[si].type === 'zine' && !!doc.sides[si].joinCovers;
-export const isCover = (pi) => pi === 0 || pi === 7;
-export const spreads = (doc, si) => (coversJoined(doc, si) ? SPREADS_JOINED : SPREADS);
+// Многостраничные стороны: зин (8 страниц) и брошюра (сколько угодно, кратно 4)
+export const isPaged = (doc, si) => doc.sides[si].type === 'zine' || doc.sides[si].type === 'booklet';
+// Обложки показаны разворотом (у зина и брошюры)
+export const coversJoined = (doc, si) => isPaged(doc, si) && !!doc.sides[si].joinCovers;
+// Обложки — первая и последняя страница
+export const isCover = (doc, si, pi) => pi === 0 || pi === pageCount(doc, si) - 1;
+export const lastPage = (doc, si) => pageCount(doc, si) - 1;
+// Развороты: обложка, пары внутренних страниц, задняя обложка (или обе обложки вместе)
+export function spreads(doc, si) {
+  if (doc.sides[si].type === 'zine') return coversJoined(doc, si) ? SPREADS_JOINED : SPREADS;
+  const n = pageCount(doc, si), inner = [];
+  for (let p = 1; p < n - 1; p += 2) inner.push([p, p + 1]);
+  return coversJoined(doc, si) ? [[n - 1, 0], ...inner] : [[0], ...inner, [n - 1]];
+}
+
+// Брошюра: раскладка на листы для домашней печати (двусторонней, переворот по короткому краю).
+// Лист i: лицо — [n−1−2i | 2i], оборот — [2i+1 | n−2−2i]. Сложенные стопкой и сшитые по сгибу,
+// листы дают страницы по порядку.
+export function bookletSheets(n) {
+  const out = [];
+  for (let i = 0; i < n / 4; i++) {
+    out.push({ sheet: i, back: false, pages: [n - 1 - 2 * i, 2 * i] });
+    out.push({ sheet: i, back: true, pages: [2 * i + 1, n - 2 - 2 * i] });
+  }
+  return out;
+}
 
 // Разворот, в котором сейчас стоит полоса: [левая, правая] или null.
 // Внутренние развороты — всегда; обложки — только в режиме «вместе».
 // На листе обе полосы любого такого разворота лежат рядом и повёрнуты одинаково — фон идёт без шва.
 export function pairOf(doc, si, pi) {
-  if (doc.sides[si].type !== 'zine') return null;
+  if (!isPaged(doc, si)) return null;
   const sp = spreads(doc, si).find((s) => s.includes(pi));
   return sp && sp.length === 2 ? sp : null;
 }
@@ -369,17 +418,17 @@ export function spreadBgOf(doc, si, pi) {
 // развороте — общий, если он задан (или его сейчас загружают: want === 'spread'), иначе — фон страницы
 export function bgHost(doc, si, pi, want) {
   const p = pairOf(doc, si, pi), s = doc.sides[si];
-  if (p && (isCover(pi) || s.spreadBg?.[p[0]] || want === 'spread')) return { obj: (s.spreadBg ||= {}), key: String(p[0]), spread: true };
+  if (p && (isCover(doc, si, pi) || s.spreadBg?.[p[0]] || want === 'spread')) return { obj: (s.spreadBg ||= {}), key: String(p[0]), spread: true };
   return { obj: getPage(doc, si, pi), key: 'bg', spread: false };
 }
 
 export const pageCount = (doc, si) =>
-  ({ zine: 8, poster: 1, none: 0 })[doc.sides[si].type];
+  doc.sides[si].type === 'booklet' ? doc.sides[si].pages.length : ({ zine: 8, poster: 1, none: 0 })[doc.sides[si].type];
 
 export function findBlock(doc, id) {
   for (let si = 0; si < 2; si++) {
     const side = doc.sides[si];
-    const lists = side.type === 'poster' ? [side.poster] : side.type === 'zine' ? side.pages : [];
+    const lists = side.type === 'poster' ? [side.poster] : side.type === 'zine' || side.type === 'booklet' ? side.pages : [];
     for (let pi = 0; pi < lists.length; pi++) {
       const idx = lists[pi].blocks.findIndex((b) => b.id === id);
       if (idx >= 0) return { si, pi, idx, page: lists[pi], block: lists[pi].blocks[idx] };
@@ -391,7 +440,7 @@ export function findBlock(doc, id) {
 export function pageLabel(doc, si, pi) {
   if (doc.sides[si].type === 'poster') return t('Постер');
   if (pi === 0) return t('1 · обложка');
-  if (pi === 7) return t('8 · задняя обложка');
+  if (pi === lastPage(doc, si)) return t('{n} · задняя обложка', { n: pi + 1 });
   return String(pi + 1);
 }
 

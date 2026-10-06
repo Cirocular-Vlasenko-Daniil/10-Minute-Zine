@@ -1,10 +1,10 @@
 // Выгрузка в PDF: векторный текст со встроенными шрифтами, картинки 300 dpi.
 // Режим «дом»: лист ровно A4/A3. Режим «типография»: вылеты 3 мм, TrimBox/BleedBox, метки.
 
-import { FORMATS, IMPOSITION, surface } from './model.js?v=68a2e7d2';
-import { pageDL } from './layout.js?v=68a2e7d2';
-import { fontBytes, glyphPath } from './fonts.js?v=68a2e7d2';
-import { printImage, printSilhouette, ensureLoaded } from './images.js?v=68a2e7d2';
+import { FORMATS, IMPOSITION, surface, pageCount, bookletSheets } from './model.js?v=8c4ccd23';
+import { pageDL } from './layout.js?v=8c4ccd23';
+import { fontBytes, glyphPath } from './fonts.js?v=8c4ccd23';
+import { printImage, printSilhouette, ensureLoaded } from './images.js?v=8c4ccd23';
 
 const K = 72 / 25.4;
 
@@ -50,7 +50,19 @@ export async function buildPDF(doc, o) {
     const side = doc.sides[si];
     if (side.type === 'none' || !o.sides[si]) continue;
     const sf = surface(doc, si);
-    const [SW, SH] = side.type === 'poster' ? [sf.w, sf.h] : F.sheet;
+    // листы PDF этой стороны: зин и постер — один лист; брошюра — дома листы для двусторонней
+    // печати (по две страницы, порядок для скрепки), в типографию — постранично с вылетами
+    const all = { top: true, bottom: true, left: true, right: true };
+    let sheets;
+    if (side.type === 'booklet') {
+      const n = pageCount(doc, si);
+      sheets = press
+        ? Array.from({ length: n }, (_, pi) => ({ size: [sf.w, sf.h], slots: [{ pi, x: 0, y: 0, rot: 0, edge: all }] }))
+        : bookletSheets(n).map((b) => ({ size: F.sheet, slots: b.pages.map((pi, j) => ({ pi, x: j * sf.w, y: 0, rot: 0, edge: { top: true, bottom: true, left: j === 0, right: j === 1 } })) }));
+    } else if (side.type === 'poster') sheets = [{ size: [sf.w, sf.h], slots: [{ pi: 0, x: 0, y: 0, rot: 0 }] }];
+    else sheets = [{ size: F.sheet, slots: IMPOSITION.map(([pi, c, r, rot]) => ({ pi, x: c * sf.w, y: r * sf.h, rot, edge: { top: r === 0, bottom: r === 1, left: c === 0, right: c === 3 } })) }];
+    for (const sheet of sheets) {
+    const [SW, SH] = sheet.size;
     const page = pdf.addPage([(SW + 2 * off) * K, (SH + 2 * off) * K]);
     if (press) {
       page.setTrimBox(off * K, off * K, SW * K, SH * K);
@@ -60,9 +72,7 @@ export async function buildPDF(doc, o) {
     if (doc.paperPrint && doc.paper && doc.paper.toLowerCase() !== '#ffffff') {
       page.drawRectangle({ x: 0, y: 0, width: (SW + 2 * off) * K, height: (SH + 2 * off) * K, color: hex(doc.paper) });
     }
-    const slots = side.type === 'poster'
-      ? [{ pi: 0, x: 0, y: 0, rot: 0 }]
-      : IMPOSITION.map(([pi, c, r, rot]) => ({ pi, x: c * sf.w, y: r * sf.h, rot, edge: { top: r === 0, bottom: r === 1, left: c === 0, right: c === 3 } }));
+    const slots = sheet.slots;
 
     for (const s of slots) {
       // вылеты фона — только у краёв листа; у перевёрнутых полос края листа меняются местами
@@ -146,6 +156,12 @@ export async function buildPDF(doc, o) {
         for (const x of [sf.w, sf.w * 2, sf.w * 3]) { L(x, -a, x, -b, t, c, d); L(x, SH + a, x, SH + b, t, c, d); }
         L(-a, SH / 2, -b, SH / 2, t, c, d); L(SW + a, SH / 2, SW + b, SH / 2, t, c, d);
       }
+    }
+    // брошюра дома: метки сгиба посередине листа, сверху и снизу
+    if (side.type === 'booklet' && !press && o.guides) {
+      const c = rgb(0.72, 0.72, 0.72);
+      L(sf.w, SH, sf.w, SH - 3, 0.15, c); L(sf.w, 0, sf.w, 3, 0.15, c);
+    }
     }
   }
   return pdf.save();

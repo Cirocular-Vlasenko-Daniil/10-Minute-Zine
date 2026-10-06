@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf } from './model.js?v=68a2e7d2';
-import { t } from './i18n.js?v=68a2e7d2';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=68a2e7d2';
-import { parseText, countChars } from './md.js?v=68a2e7d2';
-import { fitRect, assets } from './images.js?v=68a2e7d2';
-import { qrGrid, gridPath } from './qr.js?v=68a2e7d2';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=8c4ccd23';
+import { t } from './i18n.js?v=8c4ccd23';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=8c4ccd23';
+import { parseText, countChars } from './md.js?v=8c4ccd23';
+import { fitRect, assets } from './images.js?v=8c4ccd23';
+import { qrGrid, gridPath } from './qr.js?v=8c4ccd23';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -443,12 +443,12 @@ function singleLayout(doc, si, pi) {
   const g = T.body.lead;
   const m = sf.margin;
   const inner = { x: m, y: m, w: sf.w - 2 * m, h: sf.h - 2 * m };
-  const zine = sf.kind === 'zine';
+  const zine = sf.kind !== 'poster'; // многостраничное: зин или брошюра — с колонтитулами
   const hH = Tb.small.lead * 2;
   const top = zine && doc.hf.header.on ? hH : 0;
   const bot = zine && doc.hf.footer.on ? hH : 0;
   // обложки без колонтитулов: сетка того же размера, но по центру — место под колонтитулы делим поровну
-  const bare = zine && doc.hf.skipCovers && (pi === 0 || pi === 7);
+  const bare = zine && doc.hf.skipCovers && isCover(doc, si, pi);
   const content = { x: inner.x, y: inner.y + (bare ? (top + bot) / 2 : top), w: inner.w, h: inner.h - top - bot };
   const rowH = (content.h - (sf.rows - 1) * g) / sf.rows;
   const colW = (content.w - (sf.cols - 1) * g) / sf.cols;
@@ -483,14 +483,14 @@ export function cellAt(L, xm, ym) {
   return { cx: Math.max(0, Math.min(L.sf.cols - 1, c)), cy: Math.max(0, Math.min(L.sf.rows - 1, r)) };
 }
 
-function colontitles(doc, L, pi) {
+function colontitles(doc, L, pi, total) {
   const n = pi + 1;
-  if (doc.hf.skipCovers && (n === 1 || n === 8)) return [];
+  if (doc.hf.skipCovers && (n === 1 || n === total)) return [];
   const { Tb, inner } = L, st = Tb.small;
   const key = fontKey(doc.fonts.body, false, false);
   const fill = (tpl) => (tpl || '')
     .replace(/\{nn\}/g, String(n).padStart(2, '0')).replace(/\{n\}/g, n)
-    .replace(/\{N\}/g, 8).replace(/\{title\}/g, doc.title || '');
+    .replace(/\{N\}/g, total).replace(/\{title\}/g, doc.title || '');
   const items = [];
   const row = (cfg, base, ruleY) => {
     // зеркально: на левых полосах разворота (чётные номера) левая и правая части меняются местами,
@@ -569,6 +569,6 @@ export function pageDL(doc, si, pi, { editor = false, print = false, bleed = nul
     if (x0 < 0 || x0 + bx.w > W) items.push({ t: 'group', clip: { x: 0, y: 0, w: W, h: L.sf.h }, items: its });
     else items.push(...its);
   }
-  if (L.sf.kind === 'zine') items.push(...colontitles(doc, L, pi));
+  if (L.sf.kind !== 'poster') items.push(...colontitles(doc, L, pi, pageCount(doc, si)));
   return { L, E, items, info };
 }

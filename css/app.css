@@ -326,15 +326,40 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 .seg[data-vert] .ic { transform: rotate(-90deg); }
 /* выбор шрифта: названия написаны своими шрифтами */
 .fontpick { position: relative; }
-.fontpick .fp-cur { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 6px 8px; }
+.fontpick .fp-cur { height: auto; width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 6px 8px; }
 .fontpick .fp-cur i { font-style: normal; font-size: 10px; }
 .fp-name { font-size: 16px; line-height: 1.2; opacity: .35; transition: opacity .15s; }
 .fp-name.ok { opacity: 1; } /* пока образец грузится — бледно, системным шрифтом */
 .fp-list { position: absolute; left: 0; right: 0; top: calc(100% - 1px); z-index: 20; background: var(--bg); border: 1px solid var(--ink);
   box-shadow: 4px 4px 0 var(--ink); max-height: 340px; overflow: auto; }
 .fp-list[hidden] { display: none; }
-.fp-list button { display: flex; width: 100%; justify-content: space-between; align-items: baseline; gap: 8px; border: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; }
+.fp-list button { height: auto; display: flex; width: 100%; justify-content: space-between; align-items: baseline; gap: 8px; border: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; }
 .fp-list button:last-child { border-bottom: 0; }
 .fp-list button.on { outline: 2px solid var(--ink); outline-offset: -2px; }
 .fp-list button small { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); white-space: nowrap; }
 .fp-list button:hover small { color: var(--bg); }
+/* брошюра на виде «Лист»: листы — лицо и оборот рядом, прокрутка */
+#canvas.scroll { overflow: auto; display: block; padding: 24px 32px; }
+#canvas.scroll .legend { max-width: none; margin: 8px auto 0; text-align: center; }
+.bsheets { display: grid; grid-template-columns: repeat(2, max-content); gap: 18px 12px; justify-content: center; }
+.bsheet { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* стартовый экран: продолжить или новый проект нужного формата */
+#start { position: fixed; inset: 0; z-index: 60; background: var(--desk); overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
+#start[hidden] { display: none; }
+.st-box { width: 760px; max-width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.st-head { display: flex; align-items: center; justify-content: space-between; }
+.st-head .logo { font: 700 22px 'Pix', 'UI'; display: flex; align-items: center; gap: 10px; }
+.st-head .logo i { width: 16px; height: 16px; background: var(--ink); box-shadow: 4px 4px 0 var(--mute); display: block; }
+.st-cont { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 14px 16px; background: var(--bg); height: auto; white-space: normal;
+  border: 1px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+.st-cont b { font-size: 15px; }
+.st-cont span { font-size: 12px; color: var(--ink2); }
+.st-cont:hover span { color: var(--bg); }
+.st-cap { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink2); margin-top: 6px; }
+.st-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.st-card { background: var(--bg); border: 1px solid var(--ink); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.st-card svg { width: 100%; height: auto; max-height: 120px; }
+.st-card b { font-size: 16px; }
+.st-card p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink2); flex: 1; }
+.st-foot { display: flex; gap: 8px; }
+@media (max-width: 760px) { .st-cards { grid-template-columns: 1fr; } }
