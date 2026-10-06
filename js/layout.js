@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=1bdd9733';
-import { t } from './i18n.js?v=1bdd9733';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=1bdd9733';
-import { parseText, countChars } from './md.js?v=1bdd9733';
-import { fitRect, assets } from './images.js?v=1bdd9733';
-import { qrGrid, gridPath } from './qr.js?v=1bdd9733';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=17cb52f6';
+import { t } from './i18n.js?v=17cb52f6';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=17cb52f6';
+import { parseText, countChars } from './md.js?v=17cb52f6';
+import { fitRect, assets } from './images.js?v=17cb52f6';
+import { qrGrid, gridPath } from './qr.js?v=17cb52f6';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -445,8 +445,9 @@ function singleLayout(doc, si, pi) {
   const g = T.body.lead;
   const m = sf.margin;
   // поле у корешка (брошюра): сетка отодвигается от сгиба. Правые страницы (нечётные номера) —
-  // корешок слева, левые (чётные) — справа; внешнее поле не меняется
-  const gut = sf.kind === 'booklet' ? Math.max(0, +doc.gutter || 0) : 0;
+  // корешок слева, левые (чётные) — справа; внешнее поле не меняется.
+  // Обложки — без сдвига: их смотрят закрытыми, поля симметричные
+  const gut = sf.kind === 'booklet' && !isCover(doc, si, pi) ? Math.max(0, +doc.gutter || 0) : 0;
   const spineLeft = (pi + 1) % 2 === 1;
   const inner = { x: m + (spineLeft ? gut : 0), y: m, w: sf.w - 2 * m - gut, h: sf.h - 2 * m };
   const zine = sf.kind !== 'poster'; // многостраничное: зин или брошюра — с колонтитулами

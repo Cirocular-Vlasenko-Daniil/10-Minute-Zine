@@ -319,5 +319,5 @@ export const EN = {
   'Печать на {p}: один разворот на листе': 'Printed on {p}: one spread per sheet',
   'Начнём с {n} страниц — добавить можно в редакторе': 'Starts with {n} pages — add more in the editor',
   'Поле у корешка': 'Gutter',
-  'Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца': 'Moves the grid away from the fold: a stapled page never opens fully',
+  'Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца. На обложках поля симметричные': 'Moves the grid away from the fold: a stapled page never opens fully. Covers keep symmetric margins',
 };

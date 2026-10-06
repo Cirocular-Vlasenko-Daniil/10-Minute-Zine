@@ -1,16 +1,16 @@
-import * as M from './model.js?v=1bdd9733';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=1bdd9733';
-import { initAnalytics, track } from './analytics.js?v=1bdd9733';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=1bdd9733';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=1bdd9733';
-import { randomPalette } from './palette.js?v=1bdd9733';
-import { pageSVG, svgInner } from './render.js?v=1bdd9733';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=1bdd9733';
-import { pagesZip } from './raster.js?v=1bdd9733';
-import { buildPDF } from './pdf.js?v=1bdd9733';
-import { htmlToMd, looksLikeMd } from './md.js?v=1bdd9733';
-import { flowMarkdown } from './flow.js?v=1bdd9733';
-import * as store from './store.js?v=1bdd9733';
+import * as M from './model.js?v=17cb52f6';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=17cb52f6';
+import { initAnalytics, track } from './analytics.js?v=17cb52f6';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=17cb52f6';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=17cb52f6';
+import { randomPalette } from './palette.js?v=17cb52f6';
+import { pageSVG, svgInner } from './render.js?v=17cb52f6';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=17cb52f6';
+import { pagesZip } from './raster.js?v=17cb52f6';
+import { buildPDF } from './pdf.js?v=17cb52f6';
+import { htmlToMd, looksLikeMd } from './md.js?v=17cb52f6';
+import { flowMarkdown } from './flow.js?v=17cb52f6';
+import * as store from './store.js?v=17cb52f6';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -544,7 +544,7 @@ function docPanel() {
     ${booklet ? `<div class="fld"><label>${tr('Размер страницы')}</label>${bsizeSeg('data-doc-bsize', d.booklet)}
       <div class="note">${bsizeNote(d.booklet)}</div></div>
     <div class="fld"><label>${tr('Поле у корешка')} · +${d.gutter || 0} ${tr('мм')}</label><input type="range" min="0" max="20" step="1" value="${d.gutter || 0}" data-gutter>
-      <div class="note">${tr('Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца')}</div></div>
+      <div class="note">${tr('Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца. На обложках поля симметричные')}</div></div>
     <div class="fld"><label>${tr('Страниц')} · ${M.pageCount(d, 0)}</label><div class="btns">
       <button data-act="pagesDel" ${M.pageCount(d, 0) <= M.BOOKLET_PAGES.min ? 'disabled' : ''}>− 4</button>
       <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
