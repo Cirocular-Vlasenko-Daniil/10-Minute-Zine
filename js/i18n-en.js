@@ -320,4 +320,8 @@ export const EN = {
   'Начнём с {n} страниц — добавить можно в редакторе': 'Starts with {n} pages — add more in the editor',
   'Поле у корешка': 'Gutter',
   'Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца. На обложках поля симметричные': 'Moves the grid away from the fold: a stapled page never opens fully. Covers keep symmetric margins',
+  'Бумага, г/м²': 'Paper, gsm',
+  'Авто': 'Auto',
+  'авто': 'auto',
+  'Выползание: при печати дома внутренние листы сдвигаются к корешку, центральный — на {c} мм. В PDF для типографии сдвига нет — его делает типография.': 'Creep: when printing at home, inner sheets shift toward the spine, the centre sheet by {c} mm. The print-shop PDF has no shift — the printer applies it.',
 };

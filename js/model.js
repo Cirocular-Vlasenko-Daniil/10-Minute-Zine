@@ -1,6 +1,6 @@
 // Модель документа, форматы и геометрия. Все размеры — в миллиметрах.
 
-import { t, getLang } from './i18n.js?v=17cb52f6';
+import { t, getLang } from './i18n.js?v=ac7257ed';
 
 export const PT = 25.4 / 72; // мм в одном пункте
 
@@ -23,16 +23,38 @@ export const BOOKLET_PAGES = { min: 8, max: 64, def: 8 };
 // Больше одного разворота — после печати лист режется на части, каждая — лист брошюры.
 // A4/A5 — разворот во весь лист A3/A4; A6 — два на A4 (книжный), A7 — четыре на A4 (альбомный).
 export const BOOKLET_SIZES = {
-  // gutter — поле у корешка по умолчанию (мм сверх обычного поля): у скрепки страница
-  // раскрывается не до конца, текст у сгиба читается хуже
-  A4: { name: 'A4', page: [210, 297], paper: 'A3', cols: 1, rows: 1, margin: 15, s: 1.45, gutter: 6 },
-  A5: { name: 'A5', page: [148.5, 210], paper: 'A4', cols: 1, rows: 1, margin: 12, s: 1.25, gutter: 4 },
-  A6: { name: 'A6', page: [105, 148.5], paper: 'A4', cols: 1, rows: 2, margin: 8, s: 1.1, gutter: 3 },
-  A7: { name: 'A7', page: [74.25, 105], paper: 'A4', cols: 2, rows: 2, margin: 6, s: 1, gutter: 2 },
-  HL: { name: '½ Letter', page: [139.7, 215.9], paper: 'Letter', cols: 1, rows: 1, margin: 12, s: 1.25, gutter: 4 },
-  QL: { name: '¼ Letter', page: [107.95, 139.7], paper: 'Letter', cols: 1, rows: 2, margin: 8, s: 1.1, gutter: 3 },
+  A4: { name: 'A4', page: [210, 297], paper: 'A3', cols: 1, rows: 1, margin: 15, s: 1.45 },
+  A5: { name: 'A5', page: [148.5, 210], paper: 'A4', cols: 1, rows: 1, margin: 12, s: 1.25 },
+  A6: { name: 'A6', page: [105, 148.5], paper: 'A4', cols: 1, rows: 2, margin: 8, s: 1.1 },
+  A7: { name: 'A7', page: [74.25, 105], paper: 'A4', cols: 2, rows: 2, margin: 6, s: 1 },
+  HL: { name: '½ Letter', page: [139.7, 215.9], paper: 'Letter', cols: 1, rows: 1, margin: 12, s: 1.25 },
+  QL: { name: '¼ Letter', page: [107.95, 139.7], paper: 'Letter', cols: 1, rows: 2, margin: 8, s: 1.1 },
 };
 export const bookletSize = (doc) => BOOKLET_SIZES[doc.booklet] || BOOKLET_SIZES.A5;
+
+// Бумага брошюры: толщина листа, мм — от неё зависят поле у корешка и выползание.
+// Толщины — типичные для офисной/мелованной бумаги этой плотности.
+export const STOCKS = { 80: 0.10, 100: 0.12, 120: 0.14, 150: 0.17 };
+export const stockT = (doc) => STOCKS[doc.stock] || STOCKS[80];
+
+// Поле у корешка (мм сверх обычного поля). Брошюра на скобе раскрывается не до конца, и тем хуже,
+// чем она толще: 2% ширины страницы + толщина блока (листов × толщина бумаги), шаг 0,5 мм.
+// A5 на 8 страниц — 3 мм, на 64 — 4,5; A4 на 64 — 6. doc.gutter — ручное значение (null — авто)
+export function autoGutter(doc) {
+  return Math.round((bookletSize(doc).page[0] * 0.02 + (pageCount(doc, 0) / 4) * stockT(doc)) * 2) / 2;
+}
+export const gutterOf = (doc) => (doc.gutter == null ? autoGutter(doc) : doc.gutter);
+
+// Выползание: при сложении внутренние листы выступают наружу; центральный — на (листов × толщина)
+// (общепринятая оценка «страниц / 4 × толщина»). Компенсация — сдвиг листа i (0 — внешний,
+// с обложками) к корешку, линейно от 0 до этой величины. Только для домашней печати: в типографии
+// её делают сами при спуске полос.
+export function creepOf(doc, si, pi) {
+  const n = pageCount(doc, si), S = n / 4;
+  if (S < 2) return 0;
+  const i = Math.floor(Math.min(pi, n - 1 - pi) / 2);
+  return (S * stockT(doc) * i) / (S - 1);
+}
 
 // Импозиция 8-полосного зина на альбомном листе 4×2:
 // [индекс полосы, колонка, ряд, повёрнута на 180°]
@@ -235,7 +257,6 @@ export function blankDoc() {
 export function blankBooklet(size, n = BOOKLET_PAGES.def) {
   const d = blankDoc();
   d.booklet = size;
-  d.gutter = BOOKLET_SIZES[size].gutter;
   d.format = BOOKLET_SIZES[size].paper; // формат бумаги — для зина, если переключиться обратно
   d.sides[0] = { ...mkSide('booklet'), pages: Array.from({ length: n }, () => ({ blocks: [] })) };
   return d;

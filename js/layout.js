@@ -1,12 +1,12 @@
 // Движок вёрстки: документ -> список примитивов (display list) в мм.
 // Примитивы: text {x,y(базовая линия),s,key,size,fill} · rect · line · image · ph (заглушка, только редактор)
 
-import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount } from './model.js?v=17cb52f6';
-import { t } from './i18n.js?v=17cb52f6';
-import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=17cb52f6';
-import { parseText, countChars } from './md.js?v=17cb52f6';
-import { fitRect, assets } from './images.js?v=17cb52f6';
-import { qrGrid, gridPath } from './qr.js?v=17cb52f6';
+import { PT, BLOCKS, pageSf, getPage, pairOf, spreadBgOf, spreadGridOf, isCover, pageCount, gutterOf, creepOf } from './model.js?v=ac7257ed';
+import { t } from './i18n.js?v=ac7257ed';
+import { W, fontKey, avgCharW, xHeight, capHeight } from './fonts.js?v=ac7257ed';
+import { parseText, countChars } from './md.js?v=ac7257ed';
+import { fitRect, assets } from './images.js?v=ac7257ed';
+import { qrGrid, gridPath } from './qr.js?v=ac7257ed';
 
 const INK = '#000000';
 const GRAY = '#6b6b6b';
@@ -447,7 +447,7 @@ function singleLayout(doc, si, pi) {
   // поле у корешка (брошюра): сетка отодвигается от сгиба. Правые страницы (нечётные номера) —
   // корешок слева, левые (чётные) — справа; внешнее поле не меняется.
   // Обложки — без сдвига: их смотрят закрытыми, поля симметричные
-  const gut = sf.kind === 'booklet' && !isCover(doc, si, pi) ? Math.max(0, +doc.gutter || 0) : 0;
+  const gut = sf.kind === 'booklet' && !isCover(doc, si, pi) ? Math.max(0, gutterOf(doc)) : 0;
   const spineLeft = (pi + 1) % 2 === 1;
   const inner = { x: m + (spineLeft ? gut : 0), y: m, w: sf.w - 2 * m - gut, h: sf.h - 2 * m };
   const zine = sf.kind !== 'poster'; // многостраничное: зин или брошюра — с колонтитулами
@@ -531,7 +531,7 @@ function bleedItem(it, bl) {
   };
 }
 
-export function pageDL(doc, si, pi, { editor = false, print = false, bleed = null } = {}) {
+export function pageDL(doc, si, pi, { editor = false, print = false, bleed = null, creep = false } = {}) {
   const L = singleLayout(doc, si, pi); // геометрия самой полосы: фон, колонтитулы
   const pair = spreadGridOf(doc, si, pi);
   const E = pair ? spreadLayout(doc, si, pair) : L; // откуда берутся блоки
@@ -566,16 +566,18 @@ export function pageDL(doc, si, pi, { editor = false, print = false, bleed = nul
     }
   }
   const W = L.sf.w;
+  // компенсация выползания (брошюра, домашняя печать): содержимое — к корешку, фон на месте
+  const cdx = creep && L.sf.kind === 'booklet' ? creepOf(doc, si, pi) * ((pi + 1) % 2 ? -1 : 1) : 0;
   for (const bx of E.boxes) {
     const r = buildBlock(bx.b, bx, ctx);
     info[bx.b.id] = { chars: r.chars, cap: r.cap, overflow: r.overflow, img: r.img, cols: r.cols, stack: r.stack, box: bx };
-    const x0 = bx.x + dx;
+    const x0 = bx.x + dx + cdx;
     if (x0 >= W || x0 + bx.w <= 0) continue; // блок целиком на другой полосе разворота
     const its = r.items.map((it) => shift(it, x0, bx.y));
     // блок через корешок: каждая полоса рисует свою часть, обрезая по своему краю
     if (x0 < 0 || x0 + bx.w > W) items.push({ t: 'group', clip: { x: 0, y: 0, w: W, h: L.sf.h }, items: its });
     else items.push(...its);
   }
-  if (L.sf.kind !== 'poster') items.push(...colontitles(doc, L, pi, pageCount(doc, si)));
+  if (L.sf.kind !== 'poster') items.push(...colontitles(doc, L, pi, pageCount(doc, si)).map((it) => (cdx ? shift(it, cdx, 0) : it)));
   return { L, E, items, info };
 }

@@ -1,16 +1,16 @@
-import * as M from './model.js?v=17cb52f6';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=17cb52f6';
-import { initAnalytics, track } from './analytics.js?v=17cb52f6';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=17cb52f6';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=17cb52f6';
-import { randomPalette } from './palette.js?v=17cb52f6';
-import { pageSVG, svgInner } from './render.js?v=17cb52f6';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=17cb52f6';
-import { pagesZip } from './raster.js?v=17cb52f6';
-import { buildPDF } from './pdf.js?v=17cb52f6';
-import { htmlToMd, looksLikeMd } from './md.js?v=17cb52f6';
-import { flowMarkdown } from './flow.js?v=17cb52f6';
-import * as store from './store.js?v=17cb52f6';
+import * as M from './model.js?v=ac7257ed';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=ac7257ed';
+import { initAnalytics, track } from './analytics.js?v=ac7257ed';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=ac7257ed';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=ac7257ed';
+import { randomPalette } from './palette.js?v=ac7257ed';
+import { pageSVG, svgInner } from './render.js?v=ac7257ed';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=ac7257ed';
+import { pagesZip } from './raster.js?v=ac7257ed';
+import { buildPDF } from './pdf.js?v=ac7257ed';
+import { htmlToMd, looksLikeMd } from './md.js?v=ac7257ed';
+import { flowMarkdown } from './flow.js?v=ac7257ed';
+import * as store from './store.js?v=ac7257ed';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -242,7 +242,7 @@ function renderBookletSheets(sf) {
     let g = '', slots = '', lines = '';
     for (const c of p.cells) {
       c.pages.forEach((pi, j) => {
-        const { items } = pageDL(S.doc, S.side, pi), x = c.x + j * pw;
+        const { items } = pageDL(S.doc, S.side, pi, { creep: true }), x = c.x + j * pw; // как в домашнем PDF
         g += `<g transform="translate(${x} ${c.y})">${svgInner(items)}</g>`;
         slots += `<div class="slot" data-goto="${pi}" style="left:${pc(x, SW)};top:${pc(c.y, SH)};width:${pc(pw, SW)};height:${pc(ph, SH)}"><span>${pi + 1}</span></div>`;
       });
@@ -300,6 +300,15 @@ function sizeRect(f, L, w, h) {
   const r = { x: Math.min(b.x, L.sf.cols - w), y: b.y, w, h };
   return M.canRect(f.page, L.sf, r, b.id) ? r : null;
 }
+
+// Выползание: сколько сдвигаем центральный лист при домашней печати
+function creepNote(d) {
+  const n = M.pageCount(d, 0), c = M.creepOf(d, 0, n / 2 - 1).toFixed(2).replace('.', ',');
+  return tr('Выползание: при печати дома внутренние листы сдвигаются к корешку, центральный — на {c} мм. В PDF для типографии сдвига нет — его делает типография.', { c });
+}
+
+// Поле у корешка: подпись со значением и пометкой «авто»
+const gutterLabel = (d) => `${tr('Поле у корешка')} · +${String(M.gutterOf(d)).replace('.', ',')} ${tr('мм')}${d.gutter == null ? ' · ' + tr('авто') : ''}`;
 
 // Размер страницы брошюры и подсказка, как она печатается
 const bsizeSeg = (attr, cur) => `<div class="seg sm full bsizes">${Object.entries(M.BOOKLET_SIZES).map(([k, b]) =>
@@ -543,8 +552,11 @@ function docPanel() {
   <div class="sec"><div class="lbl">${tr('Лист')}</div>
     ${booklet ? `<div class="fld"><label>${tr('Размер страницы')}</label>${bsizeSeg('data-doc-bsize', d.booklet)}
       <div class="note">${bsizeNote(d.booklet)}</div></div>
-    <div class="fld"><label>${tr('Поле у корешка')} · +${d.gutter || 0} ${tr('мм')}</label><input type="range" min="0" max="20" step="1" value="${d.gutter || 0}" data-gutter>
+    <div class="fld"><label>${tr('Бумага, г/м²')}</label>${seg('data-doc-stock', Object.keys(M.STOCKS).map((k) => [k, k]), String(d.stock || 80))}</div>
+    <div class="fld"><label>${gutterLabel(d)}</label><input type="range" min="0" max="20" step="0.5" value="${M.gutterOf(d)}" data-gutter>
+      ${d.gutter != null ? `<div class="btns"><button data-act="gutterAuto">${tr('Авто')} · +${M.autoGutter(d)} ${tr('мм')}</button></div>` : ''}
       <div class="note">${tr('Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца. На обложках поля симметричные')}</div></div>
+    <div class="note">${creepNote(d)}</div>
     <div class="fld"><label>${tr('Страниц')} · ${M.pageCount(d, 0)}</label><div class="btns">
       <button data-act="pagesDel" ${M.pageCount(d, 0) <= M.BOOKLET_PAGES.min ? 'disabled' : ''}>− 4</button>
       <button data-act="pagesAdd" ${M.pageCount(d, 0) >= M.BOOKLET_PAGES.max ? 'disabled' : ''}>+ 4</button></div>
@@ -737,6 +749,7 @@ function act(a, el) {
       if (box) Object.assign(f.block, { zoom: +containZoom(f.block.asset, f.block.rot, box.w, box.h).toFixed(4), px: 0.5, py: 0.5 });
       commit(); renderAll();
     } break;
+    case 'gutterAuto': delete S.doc.gutter; commit(); renderAll(); break;
     case 'pagesAdd': case 'pagesDel': {
       const n = M.pageCount(S.doc, 0) + (a === 'pagesAdd' ? 4 : -4);
       if (a === 'pagesDel') {
@@ -1198,9 +1211,9 @@ insp.addEventListener('input', (e) => {
     if (t.dataset.bgprop === 'blur') lab.textContent = `${tr('Блюр')} · ${(+t.value).toFixed(1)} ${tr('мм')}`;
     if (t.dataset.bgprop === 'grain') lab.textContent = `${tr('Зерно растра')} · ${(+t.value).toFixed(2)} ${tr('мм')}`;
     renderView(); commitSoon();
-  } else if (t.dataset.gutter !== undefined) { // поле у корешка брошюры
+  } else if (t.dataset.gutter !== undefined) { // поле у корешка брошюры — вручную
     S.doc.gutter = +t.value;
-    t.previousElementSibling.textContent = `${tr('Поле у корешка')} · +${t.value} ${tr('мм')}`;
+    t.previousElementSibling.textContent = gutterLabel(S.doc);
     renderView(); commitSoon();
   } else if (t.dataset.inkCustom) {
     S.doc.colors[t.dataset.inkCustom] = t.value;
@@ -1357,6 +1370,7 @@ insp.addEventListener('click', async (e) => {
     commit(); renderAll(); return;
   }
   if (d.paper) { S.doc.paper = d.paper; commit(); renderAll(); return; }
+  if (d.docStock) { S.doc.stock = +d.docStock; commit(); renderAll(); return; }
   if (d.docBsize) { // брошюра: другой размер страницы — сетка и блоки остаются, меняется масштаб
     S.doc.booklet = d.docBsize; S.doc.format = M.BOOKLET_SIZES[d.docBsize].paper;
     commit(); renderAll(); return;
