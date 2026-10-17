@@ -330,7 +330,11 @@ export const EN = {
   'Поле у корешка': 'Gutter',
   'Сетка отодвигается от сгиба: у скрепки страница раскрывается не до конца. На обложках поля симметричные': 'Moves the grid away from the fold: a stapled page never opens fully. Covers keep symmetric margins',
   'Бумага, г/м²': 'Paper, gsm',
-  'Авто': 'Auto',
   'авто': 'auto',
   'Выползание: в PDF содержимое внутренних листов сдвигается к корешку, центрального — на {c} мм. Если типография делает компенсацию сама, предупредите её.': 'Creep: in the PDF the content of inner sheets shifts toward the spine, the centre sheet by {c} mm. If your printer applies its own compensation, tell them.',
+  'Гротески': 'Sans serif',
+  'Антиквы': 'Serif',
+  'Акцидентные': 'Display',
+  'Рукописные': 'Handwritten',
+  'Моноширинные': 'Monospace',
 };

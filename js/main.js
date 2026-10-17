@@ -1,16 +1,16 @@
-import * as M from './model.js?v=076f44a3';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=076f44a3';
-import { initAnalytics, track } from './analytics.js?v=076f44a3';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=076f44a3';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=076f44a3';
-import { randomPalette } from './palette.js?v=076f44a3';
-import { pageSVG, svgInner } from './render.js?v=076f44a3';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=076f44a3';
-import { pagesZip } from './raster.js?v=076f44a3';
-import { buildPDF } from './pdf.js?v=076f44a3';
-import { htmlToMd, looksLikeMd } from './md.js?v=076f44a3';
-import { flowMarkdown } from './flow.js?v=076f44a3';
-import * as store from './store.js?v=076f44a3';
+import * as M from './model.js?v=b8b66801';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=b8b66801';
+import { initAnalytics, track } from './analytics.js?v=b8b66801';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=b8b66801';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=b8b66801';
+import { randomPalette } from './palette.js?v=b8b66801';
+import { pageSVG, svgInner } from './render.js?v=b8b66801';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=b8b66801';
+import { pagesZip } from './raster.js?v=b8b66801';
+import { buildPDF } from './pdf.js?v=b8b66801';
+import { htmlToMd, looksLikeMd } from './md.js?v=b8b66801';
+import { flowMarkdown } from './flow.js?v=b8b66801';
+import * as store from './store.js?v=b8b66801';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -341,14 +341,22 @@ function bsizeNote(key) {
 }
 
 // Выбор шрифта: свой список, каждое название написано своим шрифтом (образцы грузятся при открытии)
+// шрифты по группам — список длинный, так в нём легче ориентироваться
+const FONT_CATS = [['sans', 'Гротески'], ['serif', 'Антиквы'], ['display', 'Акцидентные'], ['hand', 'Рукописные'], ['mono', 'Моноширинные']];
+
 function fontPick(role, cur) {
   const fonts = fontList(), f = fonts.find((x) => x.id === cur) || fonts[0];
+  const item = (x) => `<button data-fp-role="${role}" data-fp-id="${x.id}" class="${x.id === f.id ? 'on' : ''}">
+      <span class="fp-name" data-fid="${x.id}" style="font-family:'zfp-${x.id}', 'UI'">${esc(x.name)}</span>
+      <small>${x.role === 'heading' ? tr('для заголовков') : tr('для текста')}</small></button>`;
+  const groups = FONT_CATS.map(([c, name]) => {
+    const fs = fonts.filter((x) => (x.cat || 'sans') === c);
+    return fs.length ? `<div class="fp-group">${tr(name)}</div>${fs.map(item).join('')}` : '';
+  }).join('');
   previewFont(f.id).then(() => insp.querySelectorAll(`.fp-name[data-fid="${f.id}"]`).forEach((e) => e.classList.add('ok')));
   return `<div class="fontpick" data-fontpick="${role}">
     <button class="fp-cur"><span class="fp-name" data-fid="${f.id}" style="font-family:'zfp-${f.id}', 'UI'">${esc(f.name)}</span><i>▾</i></button>
-    <div class="fp-list" hidden>${fonts.map((x) => `<button data-fp-role="${role}" data-fp-id="${x.id}" class="${x.id === f.id ? 'on' : ''}">
-      <span class="fp-name" data-fid="${x.id}" style="font-family:'zfp-${x.id}', 'UI'">${esc(x.name)}</span>
-      <small>${x.role === 'heading' ? tr('для заголовков') : tr('для текста')}</small></button>`).join('')}</div></div>`;
+    <div class="fp-list" hidden>${groups}</div></div>`;
 }
 
 // Выключка: пиксельные иконки вместо подписей
@@ -519,8 +527,6 @@ function blockPanel(f) {
 
 function docPanel() {
   const d = S.doc, sd = side();
-  const fonts = fontList();
-  const opt = (cur) => fonts.map((f) => `<option value="${f.id}" ${f.id === cur ? 'selected' : ''}>${f.name}</option>`).join('');
   let pageSec = '';
   if (sd.type !== 'none' && S.view !== 'sheet') { // на виде «Лист» — только настройки листа
     const L = pageLayout(d, S.side, S.page);

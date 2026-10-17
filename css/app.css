@@ -333,6 +333,7 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 .fp-list { position: absolute; left: 0; right: 0; top: calc(100% - 1px); z-index: 20; background: var(--bg); border: 1px solid var(--ink);
   box-shadow: 4px 4px 0 var(--ink); max-height: 340px; overflow: auto; }
 .fp-list[hidden] { display: none; }
+.fp-group { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 8px 10px 4px; border-bottom: 1px solid var(--ink); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
 .fp-list button { height: auto; display: flex; width: 100%; justify-content: space-between; align-items: baseline; gap: 8px; border: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; }
 .fp-list button:last-child { border-bottom: 0; }
 .fp-list button.on { outline: 2px solid var(--ink); outline-offset: -2px; }
