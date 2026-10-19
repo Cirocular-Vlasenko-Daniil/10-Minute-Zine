@@ -315,7 +315,7 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
   .top > .title, #undo, #redo, #exportBtn { display: none; }
   .mbar { grid-template-columns: 1fr 44px 44px auto; }
   .mbar [data-proxy] { border-left: 1px solid var(--line); }
-  .mbar [data-proxy="exportBtn"] { padding: 0 14px; }
+  .mbar [data-fmenu] { padding: 0 14px; }
   .mbar .hist { width: 14px; height: 14px; display: block; margin: auto; }
 }
 @media (max-width: 760px) {
@@ -437,3 +437,17 @@ body.touch .page { touch-action: none; }
 @keyframes inPrev { from { transform: translateX(calc(var(--shift, 0px) - 48px)); opacity: .25; } to { transform: translateX(var(--shift, 0px)); opacity: 1; } }
 .spread.in-next { animation: inNext .2s ease-out; }
 .spread.in-prev { animation: inPrev .2s ease-out; }
+
+/* касание: вместо кнопки PDF — меню «Файл» (печать, новый, пример, открыть, сохранить); строки над свойствами нет */
+#fileBtn { display: none; }
+body.touch #exportBtn, body.touch .filebar { display: none; }
+body.touch #fileBtn { display: inline-block; }
+@media (max-width: 760px) { body.touch #fileBtn { display: none; } } /* на телефоне — в нижней панели */
+[data-fmenu].on { background: #000; }
+.fmenu { position: fixed; z-index: 45; min-width: 240px; background: var(--bg); border: 1px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); display: flex; flex-direction: column; }
+.fmenu[hidden] { display: none; }
+.fmenu button { height: 44px; border: 0; border-bottom: 1px solid var(--line); text-align: left; padding: 0 14px; font-size: 13px; }
+.fmenu button:last-child { border-bottom: 0; }
+.fmenu .fm-main { height: auto; padding: 10px 14px; background: var(--ink); color: var(--bg); font-weight: 700; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--ink); }
+.fmenu .fm-main small { font-weight: 400; font-size: 11px; color: #cfcfcf; }
+.fmenu .fm-main:hover { background: #000; }

@@ -1,16 +1,16 @@
-import * as M from './model.js?v=9510f930';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=9510f930';
-import { initAnalytics, track } from './analytics.js?v=9510f930';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=9510f930';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=9510f930';
-import { randomPalette } from './palette.js?v=9510f930';
-import { pageSVG, svgInner } from './render.js?v=9510f930';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=9510f930';
-import { pagesZip } from './raster.js?v=9510f930';
-import { buildPDF } from './pdf.js?v=9510f930';
-import { htmlToMd, looksLikeMd } from './md.js?v=9510f930';
-import { flowMarkdown } from './flow.js?v=9510f930';
-import * as store from './store.js?v=9510f930';
+import * as M from './model.js?v=c885d2b6';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=c885d2b6';
+import { initAnalytics, track } from './analytics.js?v=c885d2b6';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=c885d2b6';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=c885d2b6';
+import { randomPalette } from './palette.js?v=c885d2b6';
+import { pageSVG, svgInner } from './render.js?v=c885d2b6';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=c885d2b6';
+import { pagesZip } from './raster.js?v=c885d2b6';
+import { buildPDF } from './pdf.js?v=c885d2b6';
+import { htmlToMd, looksLikeMd } from './md.js?v=c885d2b6';
+import { flowMarkdown } from './flow.js?v=c885d2b6';
+import * as store from './store.js?v=c885d2b6';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -1736,6 +1736,37 @@ $('#mbar [data-proxy="redo"]').innerHTML = arrowIcon(true);
 $('#undo').onclick = undo;
 $('#redo').onclick = redo;
 $('#exportBtn').onclick = () => openExport();
+
+// ---------- касание: меню «Файл» вместо кнопки PDF ----------
+// Печать — первым и заметным пунктом; дальше новый зин, пример, открыть и сохранить .zine
+function openFileMenu(btn) {
+  const m = $('#fmenu');
+  m.innerHTML = `<button data-fm="export" class="fm-main">${tr('Печать и PDF…')}<small>${tr('дом, типография, PNG для веба')}</small></button>
+    <button data-fm="new">${tr('Новый зин')}</button><button data-fm="sample">${tr('Пример')}</button>
+    <button data-fm="open">${tr('Открыть .zine…')}</button><button data-fm="save">${tr('Сохранить .zine')}</button>`;
+  m.hidden = false;
+  btn.classList.add('on');
+  // у кнопки внизу экрана — над ней, у кнопки в шапке — под ней
+  const r = btn.getBoundingClientRect();
+  m.style.right = Math.max(8, innerWidth - r.right) + 'px';
+  if (r.top > innerHeight / 2) Object.assign(m.style, { top: 'auto', bottom: innerHeight - r.top + 6 + 'px' });
+  else Object.assign(m.style, { bottom: 'auto', top: r.bottom + 6 + 'px' });
+}
+function closeFileMenu() {
+  $('#fmenu').hidden = true;
+  document.querySelectorAll('[data-fmenu].on').forEach((b) => b.classList.remove('on'));
+}
+document.addEventListener('click', (e) => {
+  const fb = e.target.closest('[data-fmenu]');
+  if (fb) {
+    if (!$('#fmenu').hidden) return closeFileMenu();
+    if (menuOpen()) closeMenu();
+    return openFileMenu(fb);
+  }
+  const it = e.target.closest('[data-fm]');
+  if (it) { closeFileMenu(); return it.dataset.fm === 'export' ? openExport() : act(it.dataset.fm); }
+  if (!$('#fmenu').hidden && !e.target.closest('#fmenu')) closeFileMenu();
+});
 canvas.addEventListener('click', (e) => {
   const tb = e.target.closest('[data-tb]');
   if (tb) return tbAct(tb.dataset.tb);
@@ -1744,6 +1775,7 @@ canvas.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#fmenu').hidden) { closeFileMenu(); return; }
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === 'z' && !isTyping(document.activeElement)) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && e.key.toLowerCase() === 'y' && !isTyping(document.activeElement)) { e.preventDefault(); redo(); return; }
