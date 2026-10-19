@@ -313,7 +313,7 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 
 @media (max-width: 760px) {
   .top > .title, #undo, #redo, #exportBtn { display: none; }
-  .mbar { grid-template-columns: 1fr 1fr 44px 44px auto; }
+  .mbar { grid-template-columns: 1fr 44px 44px auto; }
   .mbar [data-proxy] { border-left: 1px solid var(--line); }
   .mbar [data-proxy="exportBtn"] { padding: 0 14px; }
   .mbar .hist { width: 14px; height: 14px; display: block; margin: auto; }
@@ -341,3 +341,67 @@ svg .row { fill: rgba(0, 0, 0, .025); stroke: #b8b8b8; stroke-width: .15; stroke
 .fp-list .fp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* длинное название не выталкивает подпись */
 .fp-list button small { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); white-space: nowrap; }
 .fp-list button:hover small { color: var(--bg); }
+
+/* ---------- касание (телефон, планшет): панель у блока, «+», блок рисуется пальцем по ячейкам ---------- */
+.fab, .tmenu, .shead { display: none; }
+#canvas { grid-row: 1; grid-column: 1; } /* «+» и меню лежат поверх холста в той же ячейке */
+#nav { grid-row: 2; grid-column: 1; }
+body.touch .fab {
+  display: flex; grid-row: 1; grid-column: 1; align-self: end; justify-self: end; margin: 0 14px 14px 0; z-index: 6;
+  width: 52px; height: 52px; padding: 0; align-items: center; justify-content: center;
+  font-size: 30px; line-height: 1; background: var(--ink); color: var(--bg); box-shadow: 4px 4px 0 var(--mute);
+}
+body.touch.no-blocks .fab, body.menu-open .fab { display: none; }
+body.touch .tmenu:not([hidden]) {
+  display: block; grid-row: 1; grid-column: 1; align-self: end; justify-self: center; z-index: 7;
+  width: min(440px, calc(100% - 20px)); margin-bottom: 10px; background: var(--bg); border: 1px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+}
+body.touch .tmenu.up:not([hidden]) { align-self: start; margin: 10px 0 0; }
+.tm-head { display: flex; align-items: center; justify-content: space-between; padding-left: 12px; border-bottom: 1px solid var(--ink); }
+.tm-head b { font-size: 13px; }
+.tm-head button { width: 44px; height: 40px; padding: 0; border: 0; font-size: 15px; }
+.tm-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.tm-grid button {
+  height: auto; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: normal; text-align: center;
+  font-size: 11px; line-height: 1.2; padding: 8px 4px;
+}
+.tm-grid button:nth-child(3n) { border-right: 0; }
+.tmenu .note { padding: 8px 12px; line-height: 1.4; }
+/* панель действий над выделенным блоком */
+.tbar { position: absolute; z-index: 8; display: flex; background: var(--ink); box-shadow: 3px 3px 0 var(--mute); }
+.tbar button { height: 40px; min-width: 44px; padding: 0 12px; border: 0; background: var(--ink); color: var(--bg); font-size: 13px; }
+.tbar button + button { border-left: 1px solid #555; }
+.tbar button:hover:not(:disabled) { background: #000; }
+body.dnd .tbar { display: none; }
+/* место нового блока, нарисованное пальцем */
+.ins.draw { background: rgba(43, 43, 43, .14); }
+.ins.bad { outline-color: var(--err); background: rgba(210, 58, 42, .12); }
+.ins.bad b { background: var(--err); }
+/* сетка видна всегда: по ней рисуют блоки; страница не прокручивается и не масштабируется под пальцем */
+body.touch .page svg .row { opacity: .7; }
+body.touch .page { touch-action: none; }
+@media (pointer: coarse) {
+  .blk .rs::before { content: ''; position: absolute; inset: -11px; } /* место под палец — 44 px */
+}
+/* раздел панели, к которому перешли с панели у блока */
+.flash { animation: flash .9s; }
+@keyframes flash { 0% { background: #fff1a6; } 100% { background: transparent; } }
+[data-part], #inspector textarea, #inspector input { scroll-margin-top: 12px; }
+
+/* планшет: страница крупно, панель свойств справа; блоки — через «+» и по ячейкам */
+@media (min-width: 761px) and (max-width: 1100px) {
+  main { grid-template-columns: minmax(0, 1fr) 300px; }
+  .left { display: none; }
+}
+/* телефон: у нижнего листа шапка с «Готово»; правка текста — на весь экран */
+@media (max-width: 760px) {
+  .shead { display: flex; align-items: center; justify-content: space-between; padding-left: 12px; border-bottom: 1px solid var(--ink); flex-shrink: 0; }
+  .shead b { font-size: 13px; }
+  .shead button { border: 0; border-left: 1px solid var(--line); height: 44px; padding: 0 18px; font-weight: 700; }
+  body.has-sel .filebar { display: none; }
+  body.m-full main { grid-template-rows: 0 minmax(0, 1fr); }
+  body.m-full .stage { visibility: hidden; overflow: hidden; }
+  body.m-full .right { height: auto; }
+  body.touch .fab { margin: 0 12px 12px 0; }
+}

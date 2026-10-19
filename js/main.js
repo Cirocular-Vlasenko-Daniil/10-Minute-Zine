@@ -1,16 +1,16 @@
-import * as M from './model.js?v=5159f6f2';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=5159f6f2';
-import { initAnalytics, track } from './analytics.js?v=5159f6f2';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=5159f6f2';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=5159f6f2';
-import { randomPalette } from './palette.js?v=5159f6f2';
-import { pageSVG, svgInner } from './render.js?v=5159f6f2';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=5159f6f2';
-import { pagesZip } from './raster.js?v=5159f6f2';
-import { buildPDF } from './pdf.js?v=5159f6f2';
-import { htmlToMd, looksLikeMd } from './md.js?v=5159f6f2';
-import { flowMarkdown } from './flow.js?v=5159f6f2';
-import * as store from './store.js?v=5159f6f2';
+import * as M from './model.js?v=acbe8693';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=acbe8693';
+import { initAnalytics, track } from './analytics.js?v=acbe8693';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=acbe8693';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=acbe8693';
+import { randomPalette } from './palette.js?v=acbe8693';
+import { pageSVG, svgInner } from './render.js?v=acbe8693';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=acbe8693';
+import { pagesZip } from './raster.js?v=acbe8693';
+import { buildPDF } from './pdf.js?v=acbe8693';
+import { htmlToMd, looksLikeMd } from './md.js?v=acbe8693';
+import { flowMarkdown } from './flow.js?v=acbe8693';
+import * as store from './store.js?v=acbe8693';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -124,6 +124,7 @@ function renderTop() {
 function renderPalette() {
   // на виде «Лист» блоки не правятся — вместо плиток подсказка
   document.body.classList.toggle('sheet-view', S.view === 'sheet');
+  document.body.classList.toggle('no-blocks', S.view === 'sheet' || side().type === 'none');
   if (S.view === 'sheet') {
     $('#palette').innerHTML = `<div class="note">${tr('Блоки добавляются на вкладке «Страницы»')}</div>`;
     return;
@@ -195,9 +196,174 @@ function renderStage() {
   if (S.view === 'sheet') return renderSheet(sf);
   const gp = M.spreadGridOf(S.doc, S.side, S.page);
   // общая сетка — разворот одним холстом (и на телефоне тоже)
-  const pages = sd.type === 'poster' ? [0] : gp ? [gp[0]] : isMobile() ? [S.page] : M.spreads(S.doc, S.side)[spreadOf(S.page)];
+  let pages = sd.type === 'poster' ? [0] : gp ? [gp[0]] : isMobile() ? [S.page] : M.spreads(S.doc, S.side)[spreadOf(S.page)];
+  // узкая сцена (планшет стоя): разворот вышел бы мелким — показываем одну страницу
+  if (pages.length > 1 && fitScale(sf.w * 2, sf.h) < fitScale(sf.w, sf.h) * 0.6) pages = [S.page];
   const k = fitScale(sf.w * (gp ? 2 : pages.length), sf.h);
   canvas.innerHTML = `<div class="spread${pages.length > 1 ? ' two' : ''}">${pages.map((p) => pageHTML(S.side, p, k)).join('')}</div>`;
+  if (S.draft) drawDraft();
+  if (touchMode() && S.sel) placeTbar();
+}
+
+// Рамка места на странице: превью при перетаскивании и при рисовании пальцем
+function insEl(L, r, cls = '') {
+  const bx = L.rect(r), sf = L.sf, e = document.createElement('div');
+  e.className = 'ins ' + cls;
+  Object.assign(e.style, {
+    left: (bx.x / sf.w) * 100 + '%', top: (bx.y / sf.h) * 100 + '%', width: (bx.w / sf.w) * 100 + '%', height: (bx.h / sf.h) * 100 + '%',
+  });
+  e.innerHTML = `<b>${r.w}×${r.h}</b>`;
+  return e;
+}
+
+// Нарисованное пальцем место ждёт выбора блока в меню
+function drawDraft() {
+  const d = S.draft, host = hostPage(d.si, d.pi);
+  const pg = canvas.querySelector(`.page[data-side="${d.si}"][data-page="${host}"]`);
+  if (pg) pg.appendChild(insEl(pageLayout(S.doc, d.si, host), d.r, 'draw'));
+}
+
+// Лёгкая отдача пальцу (Android); до первого касания браузер вибрацию запрещает
+const buzz = (ms) => { if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(ms); };
+
+// ---------- касание: панель действий над выделенным блоком ----------
+const COLOR_TYPES = new Set(['heading', 'vheading', 'text', 'vtext', 'quote', 'divider', 'qr']);
+function placeTbar() {
+  const el = canvas.querySelector('.blk.sel'), f = sel();
+  if (!el || !f) return;
+  const b = f.block, img = b.type === 'image' || b.type === 'imagecap';
+  const color = COLOR_TYPES.has(b.type) || (img && b.filter === 'dither');
+  const bar = document.createElement('div');
+  bar.className = 'tbar';
+  bar.innerHTML = `<button data-tb="edit">${img && !b.asset ? tr('Картинка…') : tr('Изменить')}</button><button data-tb="size">${tr('Размер')}</button>${color ? `<button data-tb="color">${tr('Цвет')}</button>` : ''}<button data-act="dup" aria-label="${tr('Дублировать')}">⧉</button><button data-act="del" aria-label="${tr('Удалить')}">✕</button>`;
+  canvas.appendChild(bar);
+  const cr = canvas.getBoundingClientRect(), br = el.getBoundingClientRect(), w = bar.offsetWidth, h = bar.offsetHeight;
+  // над ярлыком блока; не помещается — под блоком (ниже счётчика знаков); совсем никак — поверх блока
+  let top = br.top - cr.top - h - 26;
+  if (top < 4) top = br.bottom - cr.top + 20;
+  if (top + h > cr.height - 4) top = Math.max(4, br.top - cr.top + 4);
+  bar.style.left = Math.max(4, Math.min(cr.width - w - 4, br.left - cr.left)) + 'px';
+  bar.style.top = top + 'px';
+}
+
+// Открыть раздел панели свойств: на телефоне — нижний лист (правка текста — на весь экран)
+function openPart(part, focus) {
+  const field = focus && insp.querySelector('[data-part="body"] textarea, [data-part="body"] input[type=text], [data-part="body"] input:not([type])');
+  if (isMobile()) openSheet('inspector', !!field);
+  const el = field || insp.querySelector(`[data-part="${part}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: 'start' });
+  if (field) { field.focus({ preventScroll: true }); return; }
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+
+function tbAct(k) {
+  const f = sel();
+  if (!f) return;
+  const b = f.block;
+  if (k === 'edit' && (b.type === 'image' || b.type === 'imagecap') && !b.asset) return act('pickImg');
+  if (k === 'edit') return openPart('body', true);
+  openPart(k);
+}
+
+// ---------- касание: меню «какой блок поставить» (кнопка «+» или нарисованное место) ----------
+// Нарисованное место под блок типа type: размер подгоняется под его пределы; тап по одной
+// ячейке — размер по умолчанию, накрывая эту ячейку
+function draftRect(type, si, pi, r) {
+  if (r.w === 1 && r.h === 1) return spotFor(type, si, pi, { cx: r.x, cy: r.y });
+  const L = pageLayout(S.doc, si, pi), d = M.BLOCKS[type];
+  const w = Math.min(L.sf.cols, Math.max(d.minW, r.w)), h = Math.min(L.sf.rows, d.maxH, Math.max(d.minH, r.h));
+  const rr = { x: Math.max(0, Math.min(r.x, L.sf.cols - w)), y: Math.max(0, Math.min(r.y, L.sf.rows - h)), w, h };
+  return M.canRect(L.page, L.sf, rr) ? rr : M.placeAt(L.page, L.sf, type, w, h, r.x, r.y);
+}
+
+function openMenu() {
+  const d = S.draft, si = d ? d.si : S.side, pi = d ? d.pi : S.page;
+  const why = lim(si, pi);
+  const items = Object.entries(M.BLOCKS).map(([t, b]) => {
+    const ok = !why && !!(d ? draftRect(t, si, pi, d.r) : spotFor(t, si, pi));
+    return `<button data-new="${t}"${ok ? '' : ' disabled'}>${icon(t)}<span>${tr(b.name)}</span></button>`;
+  }).join('');
+  $('#tmenu').innerHTML = `<div class="tm-head"><b>${d && d.r.w * d.r.h > 1 ? tr('Блок {w} × {h}', { w: d.r.w, h: d.r.h }) : tr('Новый блок')}</b><button data-tm-close aria-label="${tr('Закрыть')}">✕</button></div>
+    <div class="tm-grid">${items}</div>${why ? `<div class="note">${why}</div>` : d ? '' : `<div class="note">${tr('Или проведи пальцем по пустым ячейкам — блок встанет туда')}</div>`}`;
+  // нарисованное место в нижней половине — меню сверху, чтобы его не закрыть
+  const box = canvas.querySelector('.ins.draw')?.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+  $('#tmenu').classList.toggle('up', !!box && box.top + box.height / 2 > cr.top + cr.height / 2);
+  $('#tmenu').hidden = false;
+  document.body.classList.add('menu-open');
+}
+function closeMenu() {
+  $('#tmenu').hidden = true;
+  document.body.classList.remove('menu-open');
+  if (S.draft) { S.draft = null; renderView(); }
+}
+const menuOpen = () => !$('#tmenu').hidden;
+$('#fab').addEventListener('click', () => (menuOpen() ? closeMenu() : openMenu()));
+$('#tmenu').addEventListener('click', (e) => {
+  if (e.target.closest('[data-tm-close]')) return closeMenu();
+  const bt = e.target.closest('[data-new]');
+  if (!bt || bt.disabled) return;
+  const type = bt.dataset.new, d = S.draft;
+  const si = d ? d.si : S.side, pi = d ? d.pi : S.page;
+  const r = d ? draftRect(type, si, pi, d.r) : null;
+  S.draft = null;
+  $('#tmenu').hidden = true;
+  document.body.classList.remove('menu-open');
+  if (!addBlock(type, si, pi, null, {}, r)) return;
+  // сразу к делу: картинке — выбор файла, тексту — поле ввода
+  if (type === 'image' || type === 'imagecap') act('pickImg');
+  else if (type !== 'divider') openPart('body', true);
+});
+
+// Палец по пустым ячейкам рисует место будущего блока; отпустил — меню выбора блока.
+// Короткий тап, пока выделен блок, только снимает выделение.
+function startDraw(e, pg, si, pi, hadSel) {
+  const host = +pg.dataset.page;
+  const L = pageLayout(S.doc, si, host), br = pg.getBoundingClientRect();
+  const c0 = cellOf(L, br, e);
+  let r = { x: c0.cx, y: c0.cy, w: 1, h: 1 }, moved = false, el = null;
+  const show = () => { el?.remove(); el = insEl(L, r, M.canRect(L.page, L.sf, r) ? 'draw' : 'draw bad'); pg.appendChild(el); };
+  const move = (ev) => {
+    const c = cellOf(L, br, ev);
+    const nr = { x: Math.min(c0.cx, c.cx), y: Math.min(c0.cy, c.cy), w: Math.abs(c.cx - c0.cx) + 1, h: Math.abs(c.cy - c0.cy) + 1 };
+    if (nr.x === r.x && nr.y === r.y && nr.w === r.w && nr.h === r.h) return;
+    r = nr; moved = true;
+    buzz(4);
+    show();
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    el?.remove();
+    S.sel = null; S.side = si; S.page = pi;
+    const ok = M.canRect(L.page, L.sf, r);
+    if (!moved && (hadSel || !ok)) return renderAll();
+    if (!ok) { renderAll(); return toast(tr('Здесь уже есть блоки — проведи по пустым ячейкам'), true); }
+    S.draft = { si, pi, r };
+    renderAll();
+    openMenu();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+  if (!hadSel) show();
+}
+
+// Выделенная картинка: палец ведёт — двигает кадр; держит на месте — берёт блок, чтобы перенести
+function holdOrPan(e, id, payload, label) {
+  const sx = e.clientX, sy = e.clientY;
+  const stop = () => {
+    clearTimeout(t);
+    window.removeEventListener('pointermove', mv);
+    window.removeEventListener('pointerup', stop);
+    window.removeEventListener('pointercancel', stop);
+  };
+  const mv = (ev) => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { stop(); startPan(e, id); } };
+  const t = setTimeout(() => { stop(); buzz(12); startDrag(e, payload, label, 0); }, 450);
+  window.addEventListener('pointermove', mv);
+  window.addEventListener('pointerup', stop);
+  window.addEventListener('pointercancel', stop);
 }
 
 function renderSheet(sf) {
@@ -254,6 +420,7 @@ function renderInspector() {
   document.body.classList.toggle('has-sel', !!S.sel);
   const f = sel();
   insp.innerHTML = f ? blockPanel(f) : docPanel();
+  $('#shTitle').textContent = f ? tr(M.BLOCKS[f.block.type].name) : tr('Настройки');
   updateMeter();
 }
 
@@ -308,7 +475,7 @@ function qrPos(b, f) {
 // Выбор краски элемента: основная или акцент (цвета задаются в настройках документа)
 function inkUI(b, attr = 'data-set-color', cur = b.color) {
   const c = S.doc.colors;
-  return `<div class="fld"><label>${tr('Краска')}</label>${seg(attr, [
+  return `<div class="fld" data-part="color"><label>${tr('Краска')}</label>${seg(attr, [
     ['ink', `<i class="chip" style="background:${c.ink}"></i>${tr('Основная')}`],
     ['accent', `<i class="chip" style="background:${c.accent}"></i>${tr('Акцент')}`]], cur || 'ink')}</div>`;
 }
@@ -423,11 +590,11 @@ function blockPanel(f) {
   const hasMeter = ['heading', 'text', 'quote', 'imagecap', 'qr', 'vheading', 'vtext'].includes(b.type);
   return `<div class="sec"><div class="ihead">${icon(b.type)}<b>${tr(def.name)}</b><span class="grow"></span>
       <button data-act="dup" title="${tr('Дублировать (⌘D)')}">⧉</button><button data-act="del" title="${tr('Удалить (Del)')}">✕</button></div></div>
-    <div class="sec"><div class="fld"><label>${tr('Ширина')}</label>${seg('data-size-w', wOpts, b.w)}</div>
+    <div class="sec" data-part="size"><div class="fld"><label>${tr('Ширина')}</label>${seg('data-size-w', wOpts, b.w)}</div>
       <div class="fld"><label>${tr('Высота')}</label>${seg('data-size-h', hOpts, b.h)}</div>
       ${exUI(f, L)}
       ${hasMeter ? '<div class="meter" id="meter"><div class="cells"></div><div class="mtxt"></div></div>' : ''}</div>
-    <div class="sec">${body}</div>`;
+    <div class="sec" data-part="body">${body}</div>`;
 }
 
 // шрифты по группам — список длинный, так в нём легче ориентироваться
@@ -816,12 +983,12 @@ function showDrop(t) {
   t.pg.appendChild(ins);
 }
 
-function startDrag(e, payload, label) {
+function startDrag(e, payload, label, threshold = 5) {
   const sx = e.clientX, sy = e.clientY;
   let started = false, last = null;
   const move = (ev) => {
     if (!started) {
-      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      if (threshold && Math.hypot(ev.clientX - sx, ev.clientY - sy) < threshold) return;
       started = true;
       document.body.classList.add('dnd');
       ghost = document.createElement('div');
@@ -831,7 +998,9 @@ function startDrag(e, payload, label) {
     }
     ghost.style.left = ev.clientX + 'px';
     ghost.style.top = ev.clientY + 'px';
+    const prev = last?.r && JSON.stringify(last.r);
     last = dropTarget(ev, payload);
+    if (last?.r && prev && JSON.stringify(last.r) !== prev) buzz(4);
     showDrop(last);
   };
   const up = () => {
@@ -848,6 +1017,7 @@ function startDrag(e, payload, label) {
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
+  if (threshold === 0) move(e);
 }
 
 $('#palette').addEventListener('pointerdown', (e) => {
@@ -977,7 +1147,8 @@ function startPan(e, id) {
 
 canvas.addEventListener('pointerdown', (e) => {
   // кнопки на холсте (пустой оборот) обрабатывает click — не перерисовываем их из-под курсора
-  if (e.button !== 0 || e.target.closest('button')) return;
+  if (e.button !== 0 || e.target.closest('button, .tbar')) return;
+  if (menuOpen()) { closeMenu(); return; } // тап мимо меню — передумал
   const slot = e.target.closest('.slot');
   if (slot) { S.page = +slot.dataset.goto; S.view = 'pages'; S.sel = null; renderAll(); return; }
   const pg = e.target.closest('.page[data-page]');
@@ -988,6 +1159,7 @@ canvas.addEventListener('pointerdown', (e) => {
     // общая сетка: активной становится та полоса разворота, по которой щёлкнули
     let p = pi;
     if (pg.dataset.pair) { const r = pg.getBoundingClientRect(); p = +pg.dataset.pair.split(',')[(e.clientX - r.left) / r.width < 0.5 ? 0 : 1]; }
+    if (touchMode()) { e.preventDefault(); return startDraw(e, pg, si, p, !!S.sel); }
     S.sel = null; S.side = si; S.page = p; renderAll(); return;
   }
   const id = blk.dataset.id;
@@ -995,13 +1167,13 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.target.classList.contains('rs')) return startResize(e, id, e.target.dataset.c);
   const f = M.findBlock(S.doc, id);
   const isImg = (f.block.type === 'image' || f.block.type === 'imagecap') && f.block.asset;
-  if (S.sel === id && isImg && !e.target.classList.contains('grip')) return startPan(e, id);
   // запоминаем, за какую ячейку схватили, чтобы блок не прыгал углом к курсору
   const { cx, cy } = cellOf(pageLayout(S.doc, si, pi), pg.getBoundingClientRect(), e);
-  const b = f.block;
+  const b = f.block, label = tr(M.BLOCKS[b.type].name);
   const payload = { kind: 'move', id, gx: Math.max(0, Math.min(b.w - 1, cx - b.x)), gy: Math.max(0, Math.min(b.h - 1, cy - b.y)) };
+  if (S.sel === id && isImg && !e.target.classList.contains('grip')) return touchMode() ? holdOrPan(e, id, payload, label) : startPan(e, id);
   if (S.sel !== id) { S.sel = id; S.page = pi; S.side = si; renderAll(); }
-  startDrag(e, payload, tr(M.BLOCKS[b.type].name));
+  startDrag(e, payload, label, touchMode() ? 10 : 5);
 });
 
 canvas.addEventListener('dblclick', (e) => {
@@ -1014,10 +1186,11 @@ canvas.addEventListener('dblclick', (e) => {
 const mq = matchMedia('(max-width: 760px)');
 function isMobile() { return mq.matches; }
 let sheet = null; // 'palette' | 'inspector' | null
-function openSheet(name) {
+function openSheet(name, full = false) {
   sheet = name;
   document.body.classList.toggle('m-palette', name === 'palette');
   document.body.classList.toggle('m-inspector', name === 'inspector');
+  document.body.classList.toggle('m-full', name === 'inspector' && full);
   document.querySelectorAll('#mbar [data-sheet]').forEach((b) => b.classList.toggle('on', b.dataset.sheet === name));
   renderView(); // сцена поменяла высоту — пересчитать масштаб страницы
 }
@@ -1028,6 +1201,14 @@ $('#mbar').addEventListener('click', (e) => {
   if (p) $('#' + p.dataset.proxy).click();
 });
 mq.addEventListener('change', () => { if (!isMobile()) openSheet(null); if (S.doc) renderAll(); });
+$('.shead').addEventListener('click', (e) => { if (e.target.closest('[data-sheet-close]')) { document.activeElement?.blur(); openSheet(null); } });
+
+// касание: телефон, планшет (до 1100 px) и любой экран, где указатель — палец
+const tq = matchMedia('(max-width: 1100px), (pointer: coarse)');
+function touchMode() { return tq.matches; }
+const applyTouch = () => document.body.classList.toggle('touch', tq.matches);
+applyTouch();
+tq.addEventListener('change', () => { applyTouch(); if (!tq.matches) closeMenu(); if (S.doc) renderAll(); });
 
 nav.addEventListener('click', (e) => {
   const t = e.target.closest('.thumb');
@@ -1338,6 +1519,8 @@ $('#undo').onclick = undo;
 $('#redo').onclick = redo;
 $('#exportBtn').onclick = () => openExport();
 canvas.addEventListener('click', (e) => {
+  const tb = e.target.closest('[data-tb]');
+  if (tb) return tbAct(tb.dataset.tb);
   const b = e.target.closest('button[data-act]');
   if (b) act(b.dataset.act, b);
 });
@@ -1349,6 +1532,7 @@ document.addEventListener('keydown', (e) => {
   if (isTyping(document.activeElement) || !$('#modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
   const f = sel();
   if ((e.key === 'Delete' || e.key === 'Backspace') && f) { e.preventDefault(); act('del'); }
+  else if (e.key === 'Escape' && menuOpen()) closeMenu();
   else if (e.key === 'Escape') { S.sel = null; renderAll(); }
   else if (mod && e.key.toLowerCase() === 'd' && f) { e.preventDefault(); act('dup'); }
   else if (e.key.startsWith('Arrow') && f) {
@@ -1521,4 +1705,11 @@ initAnalytics();
   } else {
     await loadSample();
   }
+  // на сенсорном экране один раз подсказываем главный жест
+  try {
+    if (touchMode() && !localStorage.getItem('zine-hint-draw')) {
+      localStorage.setItem('zine-hint-draw', '1');
+      setTimeout(() => toast(tr('Проведи пальцем по пустым ячейкам, чтобы добавить блок')), 800);
+    }
+  } catch (e) { /* без хранилища — без подсказки */ }
 })();
