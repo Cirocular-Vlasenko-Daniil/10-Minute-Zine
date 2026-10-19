@@ -1,16 +1,16 @@
-import * as M from './model.js?v=3af4b0c1';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=3af4b0c1';
-import { initAnalytics, track } from './analytics.js?v=3af4b0c1';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=3af4b0c1';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=3af4b0c1';
-import { randomPalette } from './palette.js?v=3af4b0c1';
-import { pageSVG, svgInner } from './render.js?v=3af4b0c1';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=3af4b0c1';
-import { pagesZip } from './raster.js?v=3af4b0c1';
-import { buildPDF } from './pdf.js?v=3af4b0c1';
-import { htmlToMd, looksLikeMd } from './md.js?v=3af4b0c1';
-import { flowMarkdown } from './flow.js?v=3af4b0c1';
-import * as store from './store.js?v=3af4b0c1';
+import * as M from './model.js?v=d3550071';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=d3550071';
+import { initAnalytics, track } from './analytics.js?v=d3550071';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=d3550071';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=d3550071';
+import { randomPalette } from './palette.js?v=d3550071';
+import { pageSVG, svgInner } from './render.js?v=d3550071';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=d3550071';
+import { pagesZip } from './raster.js?v=d3550071';
+import { buildPDF } from './pdf.js?v=d3550071';
+import { htmlToMd, looksLikeMd } from './md.js?v=d3550071';
+import { flowMarkdown } from './flow.js?v=d3550071';
+import * as store from './store.js?v=d3550071';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -201,6 +201,13 @@ function renderStage() {
   if (pages.length > 1 && fitScale(sf.w * 2, sf.h) < fitScale(sf.w, sf.h) * 0.6) pages = [S.page];
   const k = fitScale(sf.w * (gp ? 2 : pages.length), sf.h);
   canvas.innerHTML = `<div class="spread${pages.length > 1 ? ' two' : ''}">${pages.map((p) => pageHTML(S.side, p, k)).join('')}</div>`;
+  if (S.slideIn) { canvas.firstElementChild.classList.add(S.slideIn > 0 ? 'in-next' : 'in-prev'); S.slideIn = 0; }
+  // одна страница из пары — в углу её соседка: тап или свайп переходит к ней (туда же можно бросить блок)
+  const pair = touchMode() && pages.length === 1 && !gp && M.pairOf(S.doc, S.side, S.page);
+  if (pair) {
+    const o = pair.find((p) => p !== S.page), left = pair[0] === o;
+    canvas.insertAdjacentHTML('beforeend', `<button class="peer ${left ? 'l' : 'r'}" data-peer="${o}" aria-label="${tr('Соседняя страница')}">${left ? '<i>‹</i>' : ''}${thumbHTML(S.side, o, 56)}${left ? '' : '<i>›</i>'}</button>`);
+  }
   if (S.draft) drawDraft();
   if (touchMode() && S.sel) placeTbar();
 }
@@ -214,6 +221,29 @@ function insEl(L, r, cls = '') {
   });
   e.innerHTML = `<b>${r.w}×${r.h}</b>`;
   return e;
+}
+
+// ---------- касание: листать страницы свайпом ----------
+// Быстрый горизонтальный взмах (не рисование): по одной странице, а если на экране
+// разворот — разворотами. Возвращает false, если дальше листать некуда.
+const isFlick = (dx, dy, dt) => dt < 250 && Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy);
+function flipTo(page, dir) {
+  S.page = page; S.sel = null; S.slideIn = dir;
+  renderAll();
+}
+function flipPage(dir) {
+  if (side().type !== 'zine') return false;
+  const sp = M.spreads(S.doc, S.side);
+  if (canvas.querySelector('.spread.two') || M.spreadGridOf(S.doc, S.side, S.page)) {
+    const s = spreadOf(S.page) + dir;
+    if (s < 0 || s >= sp.length) return false;
+    flipTo(sp[s][0], dir);
+  } else {
+    const order = sp.flat(), i = order.indexOf(S.page) + dir;
+    if (i < 0 || i >= order.length) return false;
+    flipTo(order[i], dir);
+  }
+  return true;
 }
 
 // Нарисованное пальцем место ждёт выбора блока в меню
@@ -279,10 +309,12 @@ function draftRect(type, si, pi, r) {
   return M.canRect(L.page, L.sf, rr) ? rr : M.placeAt(L.page, L.sf, type, w, h, r.x, r.y);
 }
 
+// Плитки меню рядами: заголовки, тексты, служебные — горизонтальный, вертикальный, картинка в каждом ряду
+const MENU_ORDER = ['heading', 'vheading', 'image', 'text', 'vtext', 'imagecap', 'quote', 'divider', 'qr'];
 function openMenu() {
   const d = S.draft, si = d ? d.si : S.side, pi = d ? d.pi : S.page;
   const why = lim(si, pi);
-  const items = Object.entries(M.BLOCKS).map(([t, b]) => {
+  const items = MENU_ORDER.map((t) => [t, M.BLOCKS[t]]).map(([t, b]) => {
     const ok = !why && !!(d ? draftRect(t, si, pi, d.r) : spotFor(t, si, pi));
     return `<button data-new="${t}"${ok ? '' : ' disabled'}>${icon(t)}<span>${tr(b.name)}</span></button>`;
   }).join('');
@@ -322,7 +354,7 @@ $('#tmenu').addEventListener('click', (e) => {
 function startDraw(e, pg, si, pi, hadSel) {
   const host = +pg.dataset.page;
   const L = pageLayout(S.doc, si, host), br = pg.getBoundingClientRect();
-  const c0 = cellOf(L, br, e);
+  const c0 = cellOf(L, br, e), sx = e.clientX, sy = e.clientY, t0 = performance.now();
   let r = { x: c0.cx, y: c0.cy, w: 1, h: 1 }, moved = false, el = null;
   const show = () => { el?.remove(); el = insEl(L, r, M.canRect(L.page, L.sf, r) ? 'draw' : 'draw bad'); pg.appendChild(el); };
   const move = (ev) => {
@@ -333,11 +365,12 @@ function startDraw(e, pg, si, pi, hadSel) {
     buzz(4);
     show();
   };
-  const up = () => {
+  const up = (ev) => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
     el?.remove();
+    if (ev.type === 'pointerup' && isFlick(ev.clientX - sx, ev.clientY - sy, performance.now() - t0) && flipPage(ev.clientX < sx ? 1 : -1)) return;
     S.sel = null; S.side = si; S.page = pi;
     const ok = M.canRect(L.page, L.sf, r);
     if (!moved && (hadSel || !ok)) return renderAll();
@@ -1241,7 +1274,21 @@ canvas.addEventListener('pointerdown', (e) => {
   const slot = e.target.closest('.slot');
   if (slot) { S.page = +slot.dataset.goto; S.view = 'pages'; S.sel = null; renderAll(); return; }
   const pg = e.target.closest('.page[data-page]');
-  if (!pg) { if (e.target === canvas || e.target.closest('.spread') === null) { S.sel = null; renderAll(); } return; }
+  if (!pg) {
+    const desk = e.target === canvas || e.target.closest('.spread') === null;
+    if (desk && touchMode() && S.view === 'pages') { // по столу: взмах листает, тап снимает выделение
+      const sx = e.clientX, sy = e.clientY, t0 = performance.now();
+      const up = (ev) => {
+        window.removeEventListener('pointerup', up);
+        if (isFlick(ev.clientX - sx, ev.clientY - sy, performance.now() - t0) && flipPage(ev.clientX < sx ? 1 : -1)) return;
+        S.sel = null; renderAll();
+      };
+      window.addEventListener('pointerup', up);
+      return;
+    }
+    if (desk) { S.sel = null; renderAll(); }
+    return;
+  }
   const blk = e.target.closest('.blk');
   const si = +pg.dataset.side, pi = +pg.dataset.page;
   if (!blk) {
@@ -1276,6 +1323,7 @@ const mq = matchMedia('(max-width: 760px)');
 function isMobile() { return mq.matches; }
 let sheet = null; // 'palette' | 'inspector' | null
 function openSheet(name, full = false) {
+  if (name && menuOpen()) closeMenu(); // открыли свойства — выбор нового блока больше не нужен
   sheet = name;
   document.body.classList.toggle('m-palette', name === 'palette');
   document.body.classList.toggle('m-inspector', name === 'inspector');
@@ -1613,6 +1661,11 @@ $('#exportBtn').onclick = () => openExport();
 canvas.addEventListener('click', (e) => {
   const tb = e.target.closest('[data-tb]');
   if (tb) return tbAct(tb.dataset.tb);
+  const pr = e.target.closest('[data-peer]');
+  if (pr) {
+    const order = M.spreads(S.doc, S.side).flat(), p = +pr.dataset.peer;
+    return flipTo(p, Math.sign(order.indexOf(p) - order.indexOf(S.page)));
+  }
   const b = e.target.closest('button[data-act]');
   if (b) act(b.dataset.act, b);
 });

@@ -423,3 +423,18 @@ body.touch .page { touch-action: none; }
   .right .bhead { display: none; } /* имя блока — в шапке листа, копия и удаление — на панели у блока */
   body.m-inspector .fab { display: none; } /* пока открыты свойства, «+» не нужен и мешает панели у блока */
 }
+
+/* соседняя страница разворота — в углу; перелистывание — с лёгким сдвигом */
+.peer {
+  position: absolute; top: 8px; z-index: 5; height: auto; padding: 4px; display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--ink); box-shadow: 3px 3px 0 var(--mute);
+}
+.peer.l { left: 8px; }
+.peer.r { right: 8px; }
+.peer:hover:not(:disabled) { background: var(--bg); color: var(--ink); }
+.peer i { font-style: normal; font-size: 18px; line-height: 1; padding: 0 2px; }
+.peer .thumb { outline-color: var(--ink2); }
+@keyframes inNext { from { transform: translateX(48px); opacity: .25; } to { transform: none; opacity: 1; } }
+@keyframes inPrev { from { transform: translateX(-48px); opacity: .25; } to { transform: none; opacity: 1; } }
+.spread.in-next { animation: inNext .2s ease-out; }
+.spread.in-prev { animation: inPrev .2s ease-out; }
