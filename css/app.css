@@ -451,3 +451,13 @@ body.touch #fileBtn { display: inline-block; }
 .fmenu .fm-main { height: auto; padding: 10px 14px; background: var(--ink); color: var(--bg); font-weight: 700; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--ink); }
 .fmenu .fm-main small { font-weight: 400; font-size: 11px; color: #cfcfcf; }
 .fmenu .fm-main:hover { background: #000; }
+.car-tabs .ic { display: none; }
+/* вариант «плитки»: значок над подписью, плитки делят ширину поровну */
+body.tabs-icons .car-tabs button {
+  flex: 1 1 0; height: auto; min-height: 54px; padding: 7px 4px 6px; /* поровну, но не уже самого длинного слова */
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  font-size: 10px; line-height: 1.15; white-space: normal; text-align: center;
+}
+body.tabs-icons .car-tabs .ic { display: block; width: 18px; height: 18px; flex-shrink: 0; }
+body.tabs-icons .car-tabs button:not(.on) { color: var(--ink2); }
+body.tabs-icons .car-tabs button:not(.on) .ic rect { fill: var(--ink); }

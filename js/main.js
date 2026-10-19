@@ -1,16 +1,16 @@
-import * as M from './model.js?v=c885d2b6';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=c885d2b6';
-import { initAnalytics, track } from './analytics.js?v=c885d2b6';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=c885d2b6';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=c885d2b6';
-import { randomPalette } from './palette.js?v=c885d2b6';
-import { pageSVG, svgInner } from './render.js?v=c885d2b6';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=c885d2b6';
-import { pagesZip } from './raster.js?v=c885d2b6';
-import { buildPDF } from './pdf.js?v=c885d2b6';
-import { htmlToMd, looksLikeMd } from './md.js?v=c885d2b6';
-import { flowMarkdown } from './flow.js?v=c885d2b6';
-import * as store from './store.js?v=c885d2b6';
+import * as M from './model.js?v=a6b09042';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=a6b09042';
+import { initAnalytics, track } from './analytics.js?v=a6b09042';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=a6b09042';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=a6b09042';
+import { randomPalette } from './palette.js?v=a6b09042';
+import { pageSVG, svgInner } from './render.js?v=a6b09042';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=a6b09042';
+import { pagesZip } from './raster.js?v=a6b09042';
+import { buildPDF } from './pdf.js?v=a6b09042';
+import { htmlToMd, looksLikeMd } from './md.js?v=a6b09042';
+import { flowMarkdown } from './flow.js?v=a6b09042';
+import * as store from './store.js?v=a6b09042';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -36,8 +36,42 @@ const ICONS = {
 const rotCCW = (g) => g.map((_, y) => g.map((r) => r[7 - y]).join(''));
 ICONS.vheading = rotCCW(ICONS.heading);
 ICONS.vtext = rotCCW(ICONS.text);
-const icon = (t) => `<svg class="ic" viewBox="0 0 8 8" shape-rendering="crispEdges">${ICONS[t]
+const pix = (g) => `<svg class="ic" viewBox="0 0 8 8" shape-rendering="crispEdges">${g
   .map((r, y) => [...r].map((c, x) => (c === '#' ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : '')).join('')).join('')}</svg>`;
+const icon = (t) => pix(ICONS[t]);
+
+// Значки разделов свойств (плитки карусели на телефоне и планшете); ключ — название раздела
+const SEC_ICONS = {
+  'Текст': ICONS.text,
+  'Вид': ICONS.center,
+  'Цвет': ['...#....', '...##...', '..####..', '.######.', '.######.', '########', '.######.', '..####..'],
+  'Размер': ['###..###', '#......#', '#......#', '........', '........', '#......#', '#......#', '###..###'],
+  'Картинка': ICONS.image,
+  'Обработка': ['#.#.#.#.', '.#.#.#..', '#.#.#...', '.#.#....', '#.#.#...', '.#.#.#..', '#.#.#.#.', '........'],
+  'Кадр': ['.#......', '.#......', '######..', '.#...#..', '.#...#..', '..######', '.....#..', '.....#..'],
+  'Подпись': ICONS.imagecap,
+  'Стиль': ICONS.divider,
+  'Ссылка': ICONS.qr,
+  'Положение': ['########', '#......#', '#.##...#', '#.##...#', '#......#', '#......#', '#......#', '########'],
+  'Страница': ['#####...', '#...##..', '#...###.', '#......#', '#......#', '#......#', '#......#', '########'],
+  'Фон': ['########', '##.#.#.#', '#.#.#.##', '##.#.#.#', '#.#.#.##', '##.#.#.#', '#.#.#.##', '########'],
+  'Лист': ['########', '#..#...#', '#..#...#', '########', '#..#...#', '#..#...#', '########', '........'],
+  'Краски': ['###.###.', '###.###.', '###.###.', '........', '###.###.', '###.###.', '###.###.', '........'],
+  'Шрифты': ['...##...', '..#..#..', '.#....#.', '.#....#.', '.######.', '.#....#.', '.#....#.', '........'],
+  'Колонтитулы': ['########', '#.####.#', '#......#', '#......#', '#......#', '#......#', '#.####.#', '########'],
+};
+const secIcon = (k) => pix(SEC_ICONS[k] || ICONS.spacer);
+
+// A/B: вид полосы разделов — 'icons' (плитки со значками, по умолчанию) или 'text' (прежние названия).
+// Выбор держится в браузере: ?tabs=text / ?tabs=icons в адресе переключает
+const TABS = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('tabs');
+    if (q === 'text' || q === 'icons') localStorage.setItem('zine-tabs', q);
+    return localStorage.getItem('zine-tabs') === 'text' ? 'text' : 'icons';
+  } catch (e) { return 'icons'; }
+})();
+document.body.classList.add('tabs-' + TABS);
 
 // ---------- утилиты ----------
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -532,13 +566,13 @@ S.carIdx = {};
 function buildCarousel(key, top) {
   const slides = [];
   let cur = null;
-  const slide = (name) => { cur = { name, el: document.createElement('div') }; cur.el.className = 'car-slide'; slides.push(cur); };
+  const slide = (name, ico) => { cur = { name, ico, el: document.createElement('div') }; cur.el.className = 'car-slide'; slides.push(cur); };
   for (const sec of [...insp.children]) {
     if (sec.classList.contains('bhead')) continue;
     let wrap = null, part = sec.dataset.part;
     for (const node of [...sec.childNodes]) {
       if (node.nodeType === 1 && node.dataset.slide) {
-        if (!cur || cur.name !== node.dataset.slide) slide(node.dataset.slide);
+        if (!cur || cur.name !== node.dataset.slide) slide(node.dataset.slide, node.dataset.ico);
         node.remove(); wrap = null; continue;
       }
       if (node.nodeType === 3 && !node.textContent.trim()) continue;
@@ -566,7 +600,7 @@ function buildCarousel(key, top) {
   const idx = Math.min(S.carIdx[key] || 0, slides.length - 1);
   const car = document.createElement('div');
   car.className = 'car';
-  car.innerHTML = `<div class="car-tabs">${slides.map((x, i) => `<button data-car="${i}" class="${i === idx ? 'on' : ''}">${esc(x.name)}</button>`).join('')}</div><div class="car-track"></div>`;
+  car.innerHTML = `<div class="car-tabs">${slides.map((x, i) => `<button data-car="${i}" class="${i === idx ? 'on' : ''}">${secIcon(x.ico)}<span>${esc(x.name)}</span></button>`).join('')}</div><div class="car-track"></div>`;
   const track = car.lastElementChild;
   slides.forEach((x, i) => { x.el.classList.toggle('on', i === idx); track.appendChild(x.el); });
   insp.appendChild(car);
@@ -668,27 +702,27 @@ function knockUI(b) {
 }
 
 // Метка начала раздела карусели свойств (на телефоне и планшете); на компьютере не видна
-const mark = (name) => `<i class="slide-mark" data-slide="${name}" hidden></i>`;
+const mark = (key) => `<i class="slide-mark" data-slide="${tr(key)}" data-ico="${key}" hidden></i>`;
 
 function blockPanel(f) {
   const b = f.block, def = M.BLOCKS[b.type];
-  const mT = mark(tr('Текст')), mV = mark(tr('Вид')), mC = mark(tr('Цвет'));
+  const mT = mark('Текст'), mV = mark('Вид'), mC = mark('Цвет');
   const L = pageLayout(S.doc, f.si, f.pi);
   const wOpts = [], hOpts = [];
   for (let w = def.minW; w <= L.sf.cols; w++) wOpts.push([w, w, !sizeRect(f, L, w, b.h)]);
   for (let h = def.minH; h <= Math.min(def.maxH, L.sf.rows); h++) hOpts.push([h, h, !sizeRect(f, L, b.w, h)]);
   const P = (k) => `data-prop="${k}"`;
   let body = '';
-  const img = () => `${mark(tr('Картинка'))}
+  const img = () => `${mark('Картинка')}
     <div class="fld"><label>${tr('Изображение')}</label>
       ${b.asset && assets[b.asset] ? `<img class="thumbimg" src="${assets[b.asset].url}" alt="">` : ''}
       <div class="btns"><button data-act="pickImg">${b.asset ? tr('Заменить…') : tr('Загрузить…')}</button>${b.asset ? `<button data-act="rotImg" title="${tr('Повернуть на 90°')}">↻ 90°</button><button data-act="rmImg">${tr('Убрать')}</button>` : ''}</div></div>
-    ${mark(tr('Обработка'))}<div class="fld"><label>${tr('Обработка')}</label>${seg('data-set-filter', [['color', tr('Цвет')], ['gray', tr('Ч/Б')], ['dither', tr('Растр')]], b.filter)}</div>
+    ${mark('Обработка')}<div class="fld"><label>${tr('Обработка')}</label>${seg('data-set-filter', [['color', tr('Цвет')], ['gray', tr('Ч/Б')], ['dither', tr('Растр')]], b.filter)}</div>
     ${b.filter !== 'dither' ? blendUI('data-set-blend', b.blend) : ''}
     ${b.filter === 'dither' ? inkUI(b) : ''}
     ${b.filter === 'dither' || b.filter === 'gray' ? `<div class="fld"><label>${tr('Инверсия')}</label>${seg('data-set-invert', [[0, tr('Обычный')], [1, tr('Инверсия')]], b.invert ? 1 : 0)}</div>` : ''}
     ${b.filter === 'dither' ? `<div class="fld"><label>${tr('Зерно растра')} · ${b.grain.toFixed(2)} ${tr('мм')}</label><input type="range" min="0.15" max="1.2" step="0.05" value="${b.grain}" ${P('grain')} data-num></div>` : ''}
-    ${b.asset && assets[b.asset] ? mark(tr('Кадр')) + zoomUI(b, S.info[b.id]?.img, `${P('zoom')} data-num`, 'fitImg') : ''}`;
+    ${b.asset && assets[b.asset] ? mark('Кадр') + zoomUI(b, S.info[b.id]?.img, `${P('zoom')} data-num`, 'fitImg') : ''}`;
   switch (b.type) {
     case 'heading':
     case 'vheading':
@@ -732,26 +766,26 @@ function blockPanel(f) {
       break;
     case 'image': body = img(); break;
     case 'imagecap':
-      body = img() + `${mark(tr('Подпись'))}<div class="fld"><label>${tr('Подпись')}</label><textarea rows="3" ${P('caption')}>${esc(b.caption)}</textarea></div>
+      body = img() + `${mark('Подпись')}<div class="fld"><label>${tr('Подпись')}</label><textarea rows="3" ${P('caption')}>${esc(b.caption)}</textarea></div>
         ${alignUI(b, ['left', 'center', 'right', 'justify', 'force'], tr('Выключка подписи'))}`;
       break;
     case 'divider':
-      body = `${mark(tr('Стиль'))}<div class="fld"><label>${tr('Стиль')}</label>${seg('data-set-style', [['squares', '▪▪▪▪'], ['three', '▪ ▪ ▪'], ['line', '———'], ['dash', '- - -']], b.style)}</div>
+      body = `${mark('Стиль')}<div class="fld"><label>${tr('Стиль')}</label>${seg('data-set-style', [['squares', '▪▪▪▪'], ['three', '▪ ▪ ▪'], ['line', '———'], ['dash', '- - -']], b.style)}</div>
         ${mC}${inkUI(b)}`;
       break;
     case 'qr':
-      body = `${mark(tr('Ссылка'))}<div class="fld"><label>${tr('Ссылка')}</label><input ${P('url')} value="${esc(b.url)}"></div>
+      body = `${mark('Ссылка')}<div class="fld"><label>${tr('Ссылка')}</label><input ${P('url')} value="${esc(b.url)}"></div>
         <div class="fld"><label>${tr('Подпись')}</label><textarea rows="3" ${P('caption')}>${esc(b.caption)}</textarea></div>
         ${alignUI(b, ['left', 'center', 'right', 'justify', 'force'], tr('Выключка подписи'))}
         ${(() => {
           // положение кода по двум осям; «по центру» по горизонтали ставит подпись под код
           const { qrx, qry } = qrPos(b, f);
-          return `${mark(tr('Положение'))}<div class="fld"><label>${tr('Код по горизонтали')}</label>${seg('data-set-qrx', [['left', tr('Слева')], ['center', tr('Центр')], ['right', tr('Справа')]], qrx)}</div>
+          return `${mark('Положение')}<div class="fld"><label>${tr('Код по горизонтали')}</label>${seg('data-set-qrx', [['left', tr('Слева')], ['center', tr('Центр')], ['right', tr('Справа')]], qrx)}</div>
             <div class="fld"><label>${tr('Код по вертикали')}</label>${seg('data-set-qry', [['top', tr('Сверху')], ['middle', tr('Центр')], ['bottom', tr('Снизу')]], qry)}</div>`;
         })()}
         ${mC}${inkUI(b)}
         <div class="fld"><label>${tr('Цвет кода')}</label>${seg('data-set-invert', [[0, tr('Обычный')], [1, tr('Инверсия')]], b.invert ? 1 : 0)}</div>
-        ${mark(tr('Картинка'))}<div class="fld"><label>${tr('Картинка в коде')}</label>
+        ${mark('Картинка')}<div class="fld"><label>${tr('Картинка в коде')}</label>
           ${b.qrimg && assets[b.qrimg] ? `<img class="thumbimg" src="${assets[b.qrimg].url}" alt="">` : ''}
           <div class="btns"><button data-act="pickQr">${b.qrimg ? tr('Заменить…') : tr('Загрузить…')}</button>${b.qrimg ? `<button data-act="rmQr">${tr('Убрать')}</button>` : ''}</div></div>
         ${b.qrimg ? (() => {
@@ -770,7 +804,7 @@ function blockPanel(f) {
       break;
   }
   const hasMeter = ['heading', 'text', 'quote', 'imagecap', 'qr', 'vheading', 'vtext'].includes(b.type);
-  const size = `<div class="sec" data-part="size">${mark(tr('Размер'))}<div class="fld"><label>${tr('Ширина')}</label>${seg('data-size-w', wOpts, b.w)}</div>
+  const size = `<div class="sec" data-part="size">${mark('Размер')}<div class="fld"><label>${tr('Ширина')}</label>${seg('data-size-w', wOpts, b.w)}</div>
       <div class="fld"><label>${tr('Высота')}</label>${seg('data-size-h', hOpts, b.h)}</div>
       ${exUI(f, L)}
       ${hasMeter ? '<div class="meter" id="meter"><div class="cells"></div><div class="mtxt"></div></div>' : ''}</div>`;
@@ -818,7 +852,7 @@ function docPanel() {
     const ownBg = M.getPage(d, S.side, S.page).bg; // у общей сетки L.page — левая полоса, фон берём у текущей
     const own = joined && cover && !hasBg && ownBg?.asset && assets[ownBg.asset];
     const bgTitle = !host.spread ? tr('Фон страницы') : cover ? tr('Общий фон обложек') : tr('Фон разворота');
-    pageSec = `<div class="sec">${mark(tr('Страница'))}<div class="ihead"><b>${M.pageLabel(d, S.side, S.page)}</b></div>
+    pageSec = `<div class="sec">${mark('Страница')}<div class="ihead"><b>${M.pageLabel(d, S.side, S.page)}</b></div>
       <div class="btns"><button data-act="clearPage" ${L.boxes.length ? '' : 'disabled'}>${L.pair ? tr('Очистить разворот') : tr('Очистить страницу')}</button></div></div>
     <div class="sec"><div class="fld"><label>${tr('Сетка')}</label><select data-grid>${grids}</select></div>
       ${kind === 'zine' ? `<div class="btns"><button data-act="gridAll">${tr('Применить ко всем страницам')}</button></div>` : ''}
@@ -826,7 +860,7 @@ function docPanel() {
       ${L.pair ? `<div class="hint">${tr('Блоки можно тянуть через корешок — например, картинку на весь разворот. Текст на сгибе читается плохо, лучше оставлять его на одной странице.')}</div>` : ''}` : ''}</div>
     ${cover ? `<div class="sec"><div class="fld"><label>${tr('Обложки')}</label>${seg('data-join-covers', [[0, tr('Отдельно')], [1, tr('Вместе')]], joined ? 1 : 0)}</div>
       ${joined ? `<div class="hint">${tr('Задняя и передняя обложки рядом, как на листе. Фон можно сделать общим — он перейдёт через корешок.')}</div>` : ''}</div>` : ''}
-    <div class="sec">${mark(tr('Фон'))}<div class="lbl">${bgTitle}</div>
+    <div class="sec">${mark('Фон')}<div class="lbl">${bgTitle}</div>
       ${own ? `<div class="hint">${tr('Сейчас у этой обложки свой фон. Общий фон его заменит.')}</div><div class="btns"><button data-act="rmOwnBg">${tr('Убрать свой фон')}</button></div>` : ''}
       ${hasBg ? `<img class="thumbimg" src="${assets[bg.asset].url}" alt="">` : ''}
       <div class="btns"><button data-act="pickBg">${hasBg ? tr('Заменить…') : tr('Загрузить…')}</button>${hasBg ? `<button data-act="rotBg" title="${tr('Повернуть на 90°')}">↻ 90°</button><button data-act="rmBg">${tr('Убрать')}</button>` : ''}</div>
@@ -848,13 +882,13 @@ function docPanel() {
   const hfRow = (k) => `<div class="row2">${['left', 'center', 'right'].map((p) =>
     `<input data-hf="${k}.${p}" value="${esc(hf[k][p])}" placeholder="${{ left: tr('слева'), center: tr('центр'), right: tr('справа') }[p]}" title="${tr('{n} номер · {nn} 01 · {N} всего · {title} название')}" ${hf[k].on ? '' : 'disabled'}>`).join('')}</div>`;
   const titleSec = isMobile()
-    ? `<div class="sec">${mark(tr('Лист'))}<div class="fld"><label>${tr('Название')}</label><input data-doc-title value="${esc(d.title)}"></div></div>` : '';
+    ? `<div class="sec">${mark('Лист')}<div class="fld"><label>${tr('Название')}</label><input data-doc-title value="${esc(d.title)}"></div></div>` : '';
   return `${pageSec}${titleSec}
-  <div class="sec">${mark(tr('Лист'))}<div class="lbl">${tr('Лист')}</div>
+  <div class="sec">${mark('Лист')}<div class="lbl">${tr('Лист')}</div>
     <div class="fld"><label>${tr('Формат')}</label>${seg('data-doc-format', [['A4', 'A4'], ['A3', 'A3'], ['Letter', 'Letter']], d.format)}</div>
     <div class="fld"><label>${tr('Сторона A')}</label>${seg('data-side-a', [['zine', tr('Зин')], ['poster', tr('Постер')]], d.sides[0].type)}</div>
     <div class="fld"><label>${tr('Сторона B')}</label>${seg('data-side-b', [['none', tr('Пусто')], ['poster', tr('Постер')], ['zine', tr('Зин')]], d.sides[1].type)}</div>
-    ${mark(tr('Краски'))}<div class="btns"><button data-act="randPalette" title="${tr('Бумага и три краски по правилам колористики')}">${tr('Случайная палитра')}</button></div>
+    ${mark('Краски')}<div class="btns"><button data-act="randPalette" title="${tr('Бумага и три краски по правилам колористики')}">${tr('Случайная палитра')}</button></div>
     ${['ink', 'accent', 'meta'].map((k) => {
       const cur = d.colors[k].toLowerCase();
       const list = k === 'meta' ? M.META_INKS : M.INKS;
@@ -869,11 +903,11 @@ function docPanel() {
     <label class="chk"><input type="checkbox" data-paperprint ${d.paperPrint ? '' : 'checked'}> ${tr('Цветная бумага: фон не печатать')}</label>
     ${anyPoster ? `<div class="fld"><label>${tr('Ориентация постера')}</label>${seg('data-orient', [['portrait', tr('Книжная')], ['landscape', tr('Альбомная')]], (d.sides.find((s) => s.type === 'poster')).poster.orient)}</div>` : ''}
   </div>
-  <div class="sec">${mark(tr('Шрифты'))}<div class="lbl">${tr('Шрифты')}</div>
+  <div class="sec">${mark('Шрифты')}<div class="lbl">${tr('Шрифты')}</div>
     <div class="fld"><label>${tr('Заголовки')}</label>${fontPick('heading', d.fonts.heading)}</div>
     <div class="fld"><label>${tr('Текст')}</label>${fontPick('body', d.fonts.body)}</div>
   </div>
-  <div class="sec">${mark(tr('Колонтитулы'))}<div class="lbl">${tr('Колонтитулы')}</div>
+  <div class="sec">${mark('Колонтитулы')}<div class="lbl">${tr('Колонтитулы')}</div>
     <label class="chk"><input type="checkbox" data-hfon="header" ${hf.header.on ? 'checked' : ''}> ${tr('Верхний')}</label>${hfRow('header')}
     <label class="chk"><input type="checkbox" data-hfon="footer" ${hf.footer.on ? 'checked' : ''}> ${tr('Нижний')}</label>${hfRow('footer')}
     <label class="chk"><input type="checkbox" data-hfopt="skipCovers" ${hf.skipCovers ? 'checked' : ''}> ${tr('Не ставить на обложки')}</label>
