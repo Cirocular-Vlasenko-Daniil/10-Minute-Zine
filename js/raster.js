@@ -2,11 +2,11 @@
 // Рисует тот же display list, что SVG-редактор и PDF, только на canvas: текст — теми же
 // шрифтами (они уже подключены через FontFace), картинки — с теми же фильтрами и наложениями.
 
-import { pageDL } from './layout.js?v=acbe8693';
-import { cssFont } from './fonts.js?v=acbe8693';
-import { imageCanvas, silhouette, ensureLoaded } from './images.js?v=acbe8693';
-import { pageCount, surface } from './model.js?v=acbe8693';
-import { zip } from './zip.js?v=acbe8693';
+import { pageDL } from './layout.js?v=3af4b0c1';
+import { cssFont } from './fonts.js?v=3af4b0c1';
+import { imageCanvas, silhouette, ensureLoaded } from './images.js?v=3af4b0c1';
+import { pageCount, surface } from './model.js?v=3af4b0c1';
+import { zip } from './zip.js?v=3af4b0c1';
 
 function draw(x, items, k) {
   for (const it of items) {

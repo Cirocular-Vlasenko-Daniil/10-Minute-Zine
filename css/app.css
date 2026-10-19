@@ -405,3 +405,21 @@ body.touch .page { touch-action: none; }
   body.m-full .right { height: auto; }
   body.touch .fab { margin: 0 12px 12px 0; }
 }
+
+/* свойства каруселью (телефон, планшет): полоса разделов, разделы листаются свайпом */
+#inspector.has-car { display: flex; flex-direction: column; overflow: hidden; }
+.car { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.car-tabs { display: flex; flex-shrink: 0; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--ink); background: var(--bg); }
+.car-tabs::-webkit-scrollbar { display: none; }
+.car-tabs button { flex-shrink: 0; height: 40px; border: 0; border-right: 1px solid var(--line); padding: 0 14px; font-size: 12px; }
+.car-tabs button.on { background: var(--ink); color: var(--bg); }
+.car-track {
+  flex: 1; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.car-track::-webkit-scrollbar { display: none; }
+.car-slide { flex: 0 0 100%; min-width: 0; overflow-y: auto; scroll-snap-align: start; scroll-snap-stop: always; overscroll-behavior-y: contain; }
+@media (max-width: 760px) {
+  .right .bhead { display: none; } /* имя блока — в шапке листа, копия и удаление — на панели у блока */
+  body.m-inspector .fab { display: none; } /* пока открыты свойства, «+» не нужен и мешает панели у блока */
+}
