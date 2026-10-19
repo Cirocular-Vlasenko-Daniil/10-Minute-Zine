@@ -285,6 +285,7 @@ export const EN = {
   'Вертикальный текст': 'Vertical text',
   'для заголовков': 'for headings',
   'Готово': 'Done',
+  'Вернуть 1:1': 'Back to 1:1',
   'Файл': 'File',
   'Печать и PDF…': 'Print and PDF…',
   'дом, типография, PNG для веба': 'home, print shop, PNG for the web',

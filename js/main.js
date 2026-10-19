@@ -1,16 +1,16 @@
-import * as M from './model.js?v=d4b23286';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=d4b23286';
-import { initAnalytics, track } from './analytics.js?v=d4b23286';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=d4b23286';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=d4b23286';
-import { randomPalette } from './palette.js?v=d4b23286';
-import { pageSVG, svgInner } from './render.js?v=d4b23286';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=d4b23286';
-import { pagesZip } from './raster.js?v=d4b23286';
-import { buildPDF } from './pdf.js?v=d4b23286';
-import { htmlToMd, looksLikeMd } from './md.js?v=d4b23286';
-import { flowMarkdown } from './flow.js?v=d4b23286';
-import * as store from './store.js?v=d4b23286';
+import * as M from './model.js?v=a376db71';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=a376db71';
+import { initAnalytics, track } from './analytics.js?v=a376db71';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=a376db71';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=a376db71';
+import { randomPalette } from './palette.js?v=a376db71';
+import { pageSVG, svgInner } from './render.js?v=a376db71';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=a376db71';
+import { pagesZip } from './raster.js?v=a376db71';
+import { buildPDF } from './pdf.js?v=a376db71';
+import { htmlToMd, looksLikeMd } from './md.js?v=a376db71';
+import { flowMarkdown } from './flow.js?v=a376db71';
+import * as store from './store.js?v=a376db71';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -221,6 +221,7 @@ function fitScale(w, h, padX = isMobile() ? 24 : 64, padY = isMobile() ? 44 : 90
 
 function renderStage() {
   const sd = side();
+  if (sd.type === 'none' || S.view === 'sheet') { S.zoom = null; applyZoom(); }
   if (sd.type === 'none') {
     canvas.innerHTML = `<div class="empty"><div>${tr('Оборот листа пустой.')}</div><div class="btns">
       <button data-act="setB" data-val="poster">${tr('Сделать постер')}</button><button data-act="setB" data-val="zine">${tr('Второй зин')}</button></div></div>`;
@@ -255,9 +256,127 @@ function renderStage() {
     S.hsKey = key;
   }
   if (S.slideIn) { canvas.firstElementChild.classList.add(S.slideIn > 0 ? 'in-next' : 'in-prev'); S.slideIn = 0; }
+  if (S.zoom && S.zoom.key !== zoomKey()) S.zoom = null; // другая страница — снова целиком
+  applyZoom();
   if (S.draft) drawDraft();
   if (touchMode() && S.sel) placeTbar();
 }
+
+// ---------- увеличение страницы: щипок двумя пальцами; на компьютере — Ctrl/⌘ + колесо ----------
+// Растр в редакторе считается в настоящем размере точек, так что увеличенный — тот же, что в печати.
+// S.zoom = {z, tx, ty, key}: лента страниц .spread сдвигается и масштабируется от левого верхнего угла;
+// координаты — в прокручиваемом содержимом холста. Без увеличения S.zoom = null.
+const ZMAX = 6;
+const zoomKey = () => { const gp = M.spreadGridOf(S.doc, S.side, S.page); return `${S.side}:${gp ? gp[0] : S.page}:${S.view}`; };
+const canvasPt = (x, y) => { const r = canvas.getBoundingClientRect(); return { x: x - r.left + canvas.scrollLeft, y: y - r.top + canvas.scrollTop }; };
+function zoomBase() {
+  const spr = canvas.querySelector('.spread');
+  if (!spr) return null;
+  const z = S.zoom;
+  return { spr, L: { x: spr.offsetLeft, y: spr.offsetTop }, z: z?.z || 1, t: z ? { x: z.tx, y: z.ty } : { x: +spr.dataset.shift || 0, y: 0 } };
+}
+function applyZoom() {
+  const spr = canvas.querySelector('.spread'), z = S.zoom, badge = $('#zbadge');
+  badge.hidden = !z;
+  if (z) badge.innerHTML = `<b>${z.z.toFixed(1)}×</b> 1:1`;
+  if (!spr) return;
+  spr.style.transformOrigin = z ? '0 0' : '';
+  spr.style.transform = z ? `translate(${z.tx}px, ${z.ty}px) scale(${z.z})` : '';
+}
+// Масштаб z, сдвиг t; лента не уезжает с экрана больше чем наполовину
+function setZoom(z, tx, ty) {
+  const b = zoomBase();
+  if (!b) return;
+  const w = b.spr.offsetWidth * z, h = b.spr.offsetHeight * z, vw = canvas.clientWidth, vh = canvas.clientHeight;
+  const vx = canvas.scrollLeft;
+  tx = Math.min(vx + vw / 2 - b.L.x, Math.max(vx + vw / 2 - b.L.x - w, tx));
+  ty = Math.min(vh / 2 - b.L.y, Math.max(vh / 2 - b.L.y - h, ty));
+  S.zoom = { z, tx, ty, key: zoomKey() };
+  applyZoom();
+}
+// Масштаб с неподвижной точкой: что было под m (координаты холста), остаётся под m2
+function zoomAt(z, m, m2 = m) {
+  const b = zoomBase();
+  if (!b) return;
+  z = Math.min(ZMAX, Math.max(1, z));
+  const lx = (m.x - b.L.x - b.t.x) / b.z, ly = (m.y - b.L.y - b.t.y) / b.z;
+  setZoom(z, m2.x - b.L.x - z * lx, m2.y - b.L.y - z * ly);
+}
+// Обратно к целой странице (плавно)
+function resetZoom(smooth = true) {
+  const spr = canvas.querySelector('.spread');
+  S.zoom = null;
+  $('#zbadge').hidden = true;
+  if (!spr) return;
+  if (!smooth) { applyZoom(); return; }
+  spr.style.transition = 'transform .2s ease-out';
+  spr.style.transform = `translate(${+spr.dataset.shift || 0}px, 0px) scale(1)`;
+  setTimeout(() => { spr.style.transition = ''; applyZoom(); retbar(); }, 210);
+}
+const retbar = () => { canvas.querySelector('.tbar')?.remove(); if (touchMode() && S.sel) placeTbar(); };
+$('#zbadge').addEventListener('click', () => resetZoom());
+
+// Пальцы на холсте: второй начинает щипок (жест первого отменяется)
+const touches = new Map();
+let pinch = null;
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size !== 2 || S.view !== 'pages' || !canvas.querySelector('.spread')) return;
+  e.stopImmediatePropagation();
+  e.preventDefault();
+  gestureGen++;
+  clearDnD();
+  document.body.classList.remove('dnd');
+  document.body.classList.add('pinching');
+  const [a, b] = [...touches.values()];
+  pinch = { ids: [...touches.keys()], m: canvasPt((a.x + b.x) / 2, (a.y + b.y) / 2), d: Math.hypot(a.x - b.x, a.y - b.y), z: S.zoom?.z || 1, base: zoomBase() };
+}, true);
+window.addEventListener('pointermove', (e) => {
+  if (!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!pinch) return;
+  const [a, b] = pinch.ids.map((id) => touches.get(id));
+  if (!a || !b) return;
+  // от начального положения: масштаб — по расстоянию между пальцами, сдвиг — по их середине
+  const save = S.zoom;
+  S.zoom = pinch.base.z > 1 || save ? { z: pinch.base.z, tx: pinch.base.t.x, ty: pinch.base.t.y, key: zoomKey() } : null;
+  zoomAt(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, pinch.d), pinch.m, canvasPt((a.x + b.x) / 2, (a.y + b.y) / 2));
+});
+const fingerUp = (e) => {
+  touches.delete(e.pointerId);
+  if (!pinch || !pinch.ids.includes(e.pointerId)) return;
+  pinch = null;
+  document.body.classList.remove('pinching');
+  if (!S.zoom || S.zoom.z < 1.05) resetZoom();
+  else retbar();
+};
+window.addEventListener('pointerup', fingerUp);
+window.addEventListener('pointercancel', fingerUp);
+
+// Увеличенная страница: палец по столу вокруг неё двигает её
+function panZoom(e) {
+  const sx = e.clientX, sy = e.clientY, z0 = S.zoom, g = gestureGen;
+  const move = (ev) => { if (g === gestureGen && S.zoom) setZoom(z0.z, z0.tx + ev.clientX - sx, z0.ty + ev.clientY - sy); };
+  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); retbar(); };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+// Компьютер: Ctrl/⌘ + колесо (и щипок на тачпаде) — масштаб у курсора; колесо без них двигает увеличенную
+canvas.addEventListener('wheel', (e) => {
+  if (S.view !== 'pages' || !canvas.querySelector('.spread')) return;
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    const k = Math.abs(e.deltaY) > 40 ? 0.002 : 0.01; // колесо мыши — крупные шаги, тачпад — мелкие
+    const z = (S.zoom?.z || 1) * Math.exp(-e.deltaY * k);
+    if (z <= 1.01) return S.zoom && resetZoom(false);
+    zoomAt(z, canvasPt(e.clientX, e.clientY));
+    return;
+  }
+  if (S.zoom) { e.preventDefault(); setZoom(S.zoom.z, S.zoom.tx - e.deltaX, S.zoom.ty - e.deltaY); }
+}, { passive: false });
 
 // Общая сетка на узком экране: где начинается видимая область, чтобы половина листа стояла по центру
 // x страницы в прокручиваемом содержимом холста (offsetLeft не годится: у ленты есть transform)
@@ -302,13 +421,16 @@ function insEl(L, r, cls = '') {
 // ---------- касание: листать страницы свайпом ----------
 // Быстрый горизонтальный взмах (не рисование): по одной странице, а если на экране
 // разворот — разворотами. Возвращает false, если дальше листать некуда.
-const isFlick = (dx, dy, dt) => dt < 250 && Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy);
+const isFlick = (dx, dy, dt) => !S.zoom && dt < 250 && Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy);
+// Номер жеста: второй палец (щипок) увеличивает его — начатое первым пальцем отменяется
+let gestureGen = 0;
 function flipTo(page, dir) {
   S.page = page; S.sel = null; S.slideIn = dir;
   renderAll();
 }
 function flipPage(dir) {
   if (side().type !== 'zine') return false;
+  if (S.zoom) resetZoom(false);
   const sp = M.spreads(S.doc, S.side), gp = M.spreadGridOf(S.doc, S.side, S.page);
   // общая сетка на узком экране: сначала прокрутка к другой половине листа
   if (gp && canvas.classList.contains('hscroll')) {
@@ -450,10 +572,11 @@ $('#tmenu').addEventListener('click', (e) => {
 function startDraw(e, pg, si, pi, hadSel) {
   const host = +pg.dataset.page;
   const L = pageLayout(S.doc, si, host), br = pg.getBoundingClientRect();
-  const c0 = cellOf(L, br, e), sx = e.clientX, sy = e.clientY, t0 = performance.now();
+  const c0 = cellOf(L, br, e), sx = e.clientX, sy = e.clientY, t0 = performance.now(), g = gestureGen;
   let r = { x: c0.cx, y: c0.cy, w: 1, h: 1 }, moved = false, el = null;
   const show = () => { el?.remove(); el = insEl(L, r, M.canRect(L.page, L.sf, r) ? 'draw' : 'draw bad'); pg.appendChild(el); };
   const move = (ev) => {
+    if (g !== gestureGen) { el?.remove(); el = null; return; }
     const c = cellOf(L, br, ev);
     const nr = { x: Math.min(c0.cx, c.cx), y: Math.min(c0.cy, c.cy), w: Math.abs(c.cx - c0.cx) + 1, h: Math.abs(c.cy - c0.cy) + 1 };
     if (nr.x === r.x && nr.y === r.y && nr.w === r.w && nr.h === r.h) return;
@@ -466,6 +589,7 @@ function startDraw(e, pg, si, pi, hadSel) {
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
     el?.remove();
+    if (g !== gestureGen) return; // стал щипком
     if (ev.type === 'pointerup' && isFlick(ev.clientX - sx, ev.clientY - sy, performance.now() - t0) && flipPage(ev.clientX < sx ? 1 : -1)) return;
     S.sel = null; S.side = si; S.page = pi;
     const ok = M.canRect(L.page, L.sf, r);
@@ -483,15 +607,18 @@ function startDraw(e, pg, si, pi, hadSel) {
 
 // Выделенная картинка: палец ведёт — двигает кадр; держит на месте — берёт блок, чтобы перенести
 function holdOrPan(e, id, payload, label) {
-  const sx = e.clientX, sy = e.clientY;
+  const sx = e.clientX, sy = e.clientY, g = gestureGen;
   const stop = () => {
     clearTimeout(t);
     window.removeEventListener('pointermove', mv);
     window.removeEventListener('pointerup', stop);
     window.removeEventListener('pointercancel', stop);
   };
-  const mv = (ev) => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { stop(); startPan(e, id); } };
-  const t = setTimeout(() => { stop(); buzz(12); startDrag(e, payload, label, 0); }, 450);
+  const mv = (ev) => {
+    if (g !== gestureGen) return stop();
+    if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { stop(); startPan(e, id); }
+  };
+  const t = setTimeout(() => { stop(); if (g !== gestureGen) return; buzz(12); startDrag(e, payload, label, 0); }, 450);
   window.addEventListener('pointermove', mv);
   window.addEventListener('pointerup', stop);
   window.addEventListener('pointercancel', stop);
@@ -1208,9 +1335,10 @@ function showDrop(t) {
 }
 
 function startDrag(e, payload, label, threshold = 5) {
-  const sx = e.clientX, sy = e.clientY;
+  const sx = e.clientX, sy = e.clientY, g = gestureGen;
   let started = false, last = null;
   const move = (ev) => {
+    if (g !== gestureGen) return;
     if (!started) {
       if (threshold && Math.hypot(ev.clientX - sx, ev.clientY - sy) < threshold) return;
       started = true;
@@ -1232,6 +1360,7 @@ function startDrag(e, payload, label, threshold = 5) {
     window.removeEventListener('pointerup', up);
     document.body.classList.remove('dnd');
     clearDnD();
+    if (g !== gestureGen) return; // стал щипком
     if (!started) return payload.click?.();
     if (!last) return;
     if (!last.ok) return toast(last.why, true);
@@ -1282,7 +1411,7 @@ function snapStart(pos, starts, cell, last) {
 
 // corner — за какой угол тянут: br (правый нижний), tr (правый верхний), bl (левый нижний)
 function startResize(e, id, corner = 'br') {
-  const f = M.findBlock(S.doc, id), b = f.block;
+  const f = M.findBlock(S.doc, id), b = f.block, g = gestureGen;
   const L = pageLayout(S.doc, f.si, f.pi);
   const br = e.target.closest('.page').getBoundingClientRect();
   const d = M.BLOCKS[b.type];
@@ -1294,6 +1423,7 @@ function startResize(e, id, corner = 'br') {
   const left = corner === 'bl', top = corner === 'tr';
   const x1 = b.x + b.w - 1, y1 = b.y + b.h - 1; // неподвижные правый/нижний ряды для левого/верхнего края
   const move = (ev) => {
+    if (g !== gestureGen) return;
     const xm = ((ev.clientX - br.left) / br.width) * L.sf.w, ym = ((ev.clientY - br.top) / br.height) * L.sf.h;
     // по горизонтали: левый нижний угол тянет левый край, остальные — правый
     let hx;
@@ -1335,6 +1465,7 @@ function startResize(e, id, corner = 'br') {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     document.body.classList.remove('dnd');
+    if (g !== gestureGen) return restore(H.i); // стал щипком — размер как был
     commit(); renderInspector();
   };
   window.addEventListener('pointermove', move);
@@ -1351,9 +1482,10 @@ function startPan(e, id) {
   const it = inf.img;
   const sc = Math.max(it.w / a.w, it.h / a.h) * b.zoom;
   const rx = it.w - a.w * sc, ry = it.h - a.h * sc;
-  const sx = e.clientX, sy = e.clientY, px0 = b.px, py0 = b.py;
+  const sx = e.clientX, sy = e.clientY, px0 = b.px, py0 = b.py, g = gestureGen;
   let moved = false;
   const move = (ev) => {
+    if (g !== gestureGen) return;
     moved = true;
     // картинка больше рамки (rx < 0) — двигаем кадр; меньше (rx > 0) — двигаем картинку внутри рамки
     if (Math.abs(rx) > 0.01) b.px = Math.max(0, Math.min(1, px0 + ((ev.clientX - sx) * mm) / rx));
@@ -1363,7 +1495,7 @@ function startPan(e, id) {
   const up = () => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    if (moved) commit();
+    if (moved) g !== gestureGen ? restore(H.i) : commit();
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
@@ -1378,10 +1510,11 @@ canvas.addEventListener('pointerdown', (e) => {
   const cw = touchMode() && e.target.closest('.pagewrap.ctx');
   if (cw) { // приглушённая пара: тап — перейти к ней, взмах — листать
     e.preventDefault();
-    const sx = e.clientX, sy = e.clientY, t0 = performance.now();
+    const sx = e.clientX, sy = e.clientY, t0 = performance.now(), g = gestureGen;
     const toward = cw.previousElementSibling ? 1 : -1; // пара справа — вперёд
     const up = (ev) => {
       window.removeEventListener('pointerup', up);
+      if (g !== gestureGen) return;
       const dx = ev.clientX - sx;
       flipPage(isFlick(dx, ev.clientY - sy, performance.now() - t0) ? (dx < 0 ? 1 : -1) : toward);
     };
@@ -1391,12 +1524,13 @@ canvas.addEventListener('pointerdown', (e) => {
   const pg = e.target.closest('.page[data-page]');
   if (!pg) {
     const desk = e.target === canvas || e.target.closest('.spread') === null;
+    if (desk && S.zoom && S.view === 'pages') return panZoom(e); // увеличено — стол двигает страницу
     if (desk && touchMode() && S.view === 'pages') { // по столу: взмах листает, тап снимает выделение
-      const sx = e.clientX, sy = e.clientY, t0 = performance.now();
+      const sx = e.clientX, sy = e.clientY, t0 = performance.now(), g = gestureGen;
       const up = (ev) => {
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
-        if (ev.type === 'pointercancel') return; // браузер забрал жест под прокрутку листа
+        if (ev.type === 'pointercancel' || g !== gestureGen) return; // браузер забрал жест под прокрутку листа или это щипок
         if (isFlick(ev.clientX - sx, ev.clientY - sy, performance.now() - t0) && flipPage(ev.clientX < sx ? 1 : -1)) return;
         S.sel = null; renderAll();
       };

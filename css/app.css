@@ -461,3 +461,12 @@ body.tabs-icons .car-tabs button {
 body.tabs-icons .car-tabs .ic { display: block; width: 18px; height: 18px; flex-shrink: 0; }
 body.tabs-icons .car-tabs button:not(.on) { color: var(--ink2); }
 body.tabs-icons .car-tabs button:not(.on) .ic rect { fill: var(--ink); }
+
+/* увеличение страницы: плашка с кратностью, тап — обратно 1:1; на время щипка панель у блока прячется */
+.zbadge {
+  grid-row: 1; grid-column: 1; align-self: start; justify-self: start; margin: 10px; z-index: 6;
+  height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 8px; box-shadow: 3px 3px 0 var(--mute);
+}
+.zbadge[hidden] { display: none; }
+.zbadge b { font-weight: 700; }
+body.pinching .tbar { display: none; }
