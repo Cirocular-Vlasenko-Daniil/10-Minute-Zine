@@ -1,16 +1,16 @@
-import * as M from './model.js?v=a6b09042';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=a6b09042';
-import { initAnalytics, track } from './analytics.js?v=a6b09042';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=a6b09042';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=a6b09042';
-import { randomPalette } from './palette.js?v=a6b09042';
-import { pageSVG, svgInner } from './render.js?v=a6b09042';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=a6b09042';
-import { pagesZip } from './raster.js?v=a6b09042';
-import { buildPDF } from './pdf.js?v=a6b09042';
-import { htmlToMd, looksLikeMd } from './md.js?v=a6b09042';
-import { flowMarkdown } from './flow.js?v=a6b09042';
-import * as store from './store.js?v=a6b09042';
+import * as M from './model.js?v=d4b23286';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=d4b23286';
+import { initAnalytics, track } from './analytics.js?v=d4b23286';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=d4b23286';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=d4b23286';
+import { randomPalette } from './palette.js?v=d4b23286';
+import { pageSVG, svgInner } from './render.js?v=d4b23286';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=d4b23286';
+import { pagesZip } from './raster.js?v=d4b23286';
+import { buildPDF } from './pdf.js?v=d4b23286';
+import { htmlToMd, looksLikeMd } from './md.js?v=d4b23286';
+import { flowMarkdown } from './flow.js?v=d4b23286';
+import * as store from './store.js?v=d4b23286';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -563,6 +563,7 @@ function renderInspector() {
 // сверху полоса названий, под ней разделы листаются свайпом. Открытый раздел запоминается
 // для каждого вида блока (и для страницы) и не сбрасывается при перерисовке панели.
 S.carIdx = {};
+const DOC_ORDER = ['Лист', 'Страница', 'Фон', 'Краски', 'Шрифты', 'Колонтитулы'];
 function buildCarousel(key, top) {
   const slides = [];
   let cur = null;
@@ -588,6 +589,11 @@ function buildCarousel(key, top) {
     if (sec.parentElement === insp) sec.remove();
   }
   if (slides.length < 2) { insp.append(...slides.flatMap((x) => [...x.el.children])); return; }
+  // свойства зина — от общего к частному: сначала лист, потом страница и её фон, потом оформление
+  if (key === 'doc') {
+    const rank = (x) => { const i = DOC_ORDER.indexOf(x.ico); return i < 0 ? DOC_ORDER.length : i; };
+    slides.sort((a, b) => rank(a) - rank(b));
+  }
   // заголовок раздела совпадает с названием в полосе — убираем повтор
   for (const x of slides) for (const w of x.el.children) {
     const l = w.firstElementChild;
