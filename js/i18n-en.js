@@ -285,7 +285,6 @@ export const EN = {
   'Вертикальный текст': 'Vertical text',
   'для заголовков': 'for headings',
   'Готово': 'Done',
-  'Соседняя страница': 'Neighbouring page',
   'Вид': 'Look',
   'Кадр': 'Crop',
   'Положение': 'Position',

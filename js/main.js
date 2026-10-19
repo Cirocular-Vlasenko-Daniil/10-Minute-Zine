@@ -1,16 +1,16 @@
-import * as M from './model.js?v=d3550071';
-import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=d3550071';
-import { initAnalytics, track } from './analytics.js?v=d3550071';
-import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=d3550071';
-import { pageDL, pageLayout, cellAt } from './layout.js?v=d3550071';
-import { randomPalette } from './palette.js?v=d3550071';
-import { pageSVG, svgInner } from './render.js?v=d3550071';
-import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=d3550071';
-import { pagesZip } from './raster.js?v=d3550071';
-import { buildPDF } from './pdf.js?v=d3550071';
-import { htmlToMd, looksLikeMd } from './md.js?v=d3550071';
-import { flowMarkdown } from './flow.js?v=d3550071';
-import * as store from './store.js?v=d3550071';
+import * as M from './model.js?v=9510f930';
+import { t as tr, getLang, bindLangSwitch } from './i18n.js?v=9510f930';
+import { initAnalytics, track } from './analytics.js?v=9510f930';
+import { initFonts, ensureFont, fontList, hasFont, previewFont } from './fonts.js?v=9510f930';
+import { pageDL, pageLayout, cellAt } from './layout.js?v=9510f930';
+import { randomPalette } from './palette.js?v=9510f930';
+import { pageSVG, svgInner } from './render.js?v=9510f930';
+import { assets, importImage, registerAsset, setOnReady, makeSampleAsset, effectiveDpi, dimsOf, containZoom } from './images.js?v=9510f930';
+import { pagesZip } from './raster.js?v=9510f930';
+import { buildPDF } from './pdf.js?v=9510f930';
+import { htmlToMd, looksLikeMd } from './md.js?v=9510f930';
+import { flowMarkdown } from './flow.js?v=9510f930';
+import * as store from './store.js?v=9510f930';
 
 const $ = (s) => document.querySelector(s);
 const S = { doc: null, side: 0, page: 0, sel: null, view: 'pages', info: {} };
@@ -195,22 +195,64 @@ function renderStage() {
   const sf = M.surface(S.doc, S.side);
   if (S.view === 'sheet') return renderSheet(sf);
   const gp = M.spreadGridOf(S.doc, S.side, S.page);
-  // общая сетка — разворот одним холстом (и на телефоне тоже)
-  let pages = sd.type === 'poster' ? [0] : gp ? [gp[0]] : isMobile() ? [S.page] : M.spreads(S.doc, S.side)[spreadOf(S.page)];
-  // узкая сцена (планшет стоя): разворот вышел бы мелким — показываем одну страницу
-  if (pages.length > 1 && fitScale(sf.w * 2, sf.h) < fitScale(sf.w, sf.h) * 0.6) pages = [S.page];
-  const k = fitScale(sf.w * (gp ? 2 : pages.length), sf.h);
-  canvas.innerHTML = `<div class="spread${pages.length > 1 ? ' two' : ''}">${pages.map((p) => pageHTML(S.side, p, k)).join('')}</div>`;
-  if (S.slideIn) { canvas.firstElementChild.classList.add(S.slideIn > 0 ? 'in-next' : 'in-prev'); S.slideIn = 0; }
-  // одна страница из пары — в углу её соседка: тап или свайп переходит к ней (туда же можно бросить блок)
-  const pair = touchMode() && pages.length === 1 && !gp && M.pairOf(S.doc, S.side, S.page);
-  if (pair) {
-    const o = pair.find((p) => p !== S.page), left = pair[0] === o;
-    canvas.insertAdjacentHTML('beforeend', `<button class="peer ${left ? 'l' : 'r'}" data-peer="${o}" aria-label="${tr('Соседняя страница')}">${left ? '<i>‹</i>' : ''}${thumbHTML(S.side, o, 56)}${left ? '' : '<i>›</i>'}</button>`);
+  // Узкая сцена (телефон, планшет стоя): разворот целиком вышел бы мелким — страница крупно, как одна,
+  // а её пара рисуется рядом в том же масштабе, приглушённой, и видна краем; к ней — свайпом.
+  // Общая сетка остаётся одним листом в масштабе страницы и прокручивается по горизонтали.
+  const narrow = sd.type === 'zine' && (isMobile() || fitScale(sf.w * 2, sf.h) < fitScale(sf.w, sf.h) * 0.6);
+  const pad = isMobile() ? 48 : 64; // поле по бокам — чтобы пару было видно краем
+  const pair = narrow && !gp && M.pairOf(S.doc, S.side, S.page);
+  const hs = narrow && !!gp;
+  let pages, k, shift = 0;
+  if (sd.type === 'poster') { pages = [0]; k = fitScale(sf.w, sf.h); }
+  else if (gp) { pages = [gp[0]]; k = hs ? fitScale(sf.w, sf.h, pad) : fitScale(sf.w * 2, sf.h); }
+  else if (narrow) {
+    pages = pair || [S.page];
+    k = fitScale(sf.w, sf.h, pad); // один масштаб для всех страниц — без скачков при перелистывании
+    if (pair) shift = ((pair[0] === S.page ? 1 : -1) * px(sf.w * k)) / 2; // выбранная страница — по центру
+  } else { pages = M.spreads(S.doc, S.side)[spreadOf(S.page)]; k = fitScale(sf.w * pages.length, sf.h); }
+  const keep = canvas.classList.contains('hscroll') ? canvas.scrollLeft : null;
+  canvas.classList.toggle('hscroll', hs);
+  canvas.innerHTML = `<div class="spread${pages.length > 1 ? ' two' : ''}${pair ? ' peek' : ''}" style="--shift:${shift}px" data-shift="${shift}">${pages.map((p) => pageHTML(S.side, p, k)).join('')}</div>`;
+  if (pair) canvas.querySelectorAll('.page[data-page]').forEach((p) => +p.dataset.page !== S.page && p.closest('.pagewrap').classList.add('ctx'));
+  if (hs) {
+    // тот же разворот и та же половина — прокрутка остаётся, где была; иначе — к выбранной половине
+    const key = `${S.side}:${gp[0]}:${S.page}`;
+    canvas.scrollLeft = keep != null && S.hsKey === key ? keep : halfLeft(S.page === gp[1]);
+    S.hsKey = key;
   }
+  if (S.slideIn) { canvas.firstElementChild.classList.add(S.slideIn > 0 ? 'in-next' : 'in-prev'); S.slideIn = 0; }
   if (S.draft) drawDraft();
   if (touchMode() && S.sel) placeTbar();
 }
+
+// Общая сетка на узком экране: где начинается видимая область, чтобы половина листа стояла по центру
+// x страницы в прокручиваемом содержимом холста (offsetLeft не годится: у ленты есть transform)
+const contentX = (el) => el.getBoundingClientRect().left - canvas.getBoundingClientRect().left + canvas.scrollLeft;
+function halfLeft(right) {
+  const pg = canvas.querySelector('.page[data-page]');
+  if (!pg) return 0;
+  const w = pg.offsetWidth / 2;
+  return contentX(pg) + (right ? w : 0) - (canvas.clientWidth - w) / 2;
+}
+// Какая половина листа выбрана (курсор снизу и панель страницы следуют за прокруткой)
+function setHalf(p) {
+  if (S.page === p) return;
+  S.page = p;
+  S.hsKey = `${S.side}:${M.spreadGridOf(S.doc, S.side, p)[0]}:${p}`; // прокрутка уже там — не дёргать при перерисовке
+  renderNav();
+  if (!S.sel) renderInspector();
+}
+let hsT;
+canvas.addEventListener('scroll', () => {
+  if (!canvas.classList.contains('hscroll')) return;
+  clearTimeout(hsT);
+  hsT = setTimeout(() => {
+    const gp = M.spreadGridOf(S.doc, S.side, S.page), pg = canvas.querySelector('.page[data-page]');
+    if (!gp || !pg) return;
+    const mid = canvas.scrollLeft + canvas.clientWidth / 2;
+    setHalf(gp[mid > contentX(pg) + pg.offsetWidth / 2 ? 1 : 0]);
+  }, 120);
+}, { passive: true });
 
 // Рамка места на странице: превью при перетаскивании и при рисовании пальцем
 function insEl(L, r, cls = '') {
@@ -233,16 +275,35 @@ function flipTo(page, dir) {
 }
 function flipPage(dir) {
   if (side().type !== 'zine') return false;
-  const sp = M.spreads(S.doc, S.side);
-  if (canvas.querySelector('.spread.two') || M.spreadGridOf(S.doc, S.side, S.page)) {
+  const sp = M.spreads(S.doc, S.side), gp = M.spreadGridOf(S.doc, S.side, S.page);
+  // общая сетка на узком экране: сначала прокрутка к другой половине листа
+  if (gp && canvas.classList.contains('hscroll')) {
+    const half = gp.indexOf(S.page) + dir;
+    if (half === 0 || half === 1) {
+      canvas.scrollTo({ left: halfLeft(half === 1), behavior: 'smooth' });
+      setHalf(gp[half]);
+      return true;
+    }
+  } else if (gp || canvas.querySelector('.spread.two:not(.peek)')) { // на экране разворот целиком — листаем разворотами
     const s = spreadOf(S.page) + dir;
     if (s < 0 || s >= sp.length) return false;
     flipTo(sp[s][0], dir);
-  } else {
-    const order = sp.flat(), i = order.indexOf(S.page) + dir;
-    if (i < 0 || i >= order.length) return false;
-    flipTo(order[i], dir);
+    return true;
   }
+  const order = sp.flat(), i = order.indexOf(S.page) + dir;
+  if (i < 0 || i >= order.length) return false;
+  const next = order[i], spr = canvas.querySelector('.spread.peek');
+  const ctx = spr?.querySelector(`.pagewrap.ctx .page[data-page="${next}"]`)?.closest('.pagewrap');
+  if (ctx) {
+    // пара уже нарисована рядом — лента сдвигается, и она встаёт в центр
+    spr.style.transition = 'transform .22s ease-out';
+    spr.style.setProperty('--shift', -spr.dataset.shift + 'px');
+    ctx.classList.remove('ctx');
+    spr.querySelector('.pagewrap:not(.ctx) .page:not([data-page="' + next + '"])')?.closest('.pagewrap').classList.add('ctx');
+    setTimeout(() => flipTo(next, 0), 220);
+    return true;
+  }
+  flipTo(next, dir);
   return true;
 }
 
@@ -272,7 +333,8 @@ function placeTbar() {
   let top = br.top - cr.top - h - 26;
   if (top < 4) top = br.bottom - cr.top + 20;
   if (top + h > cr.height - 4) top = Math.max(4, br.top - cr.top + 4);
-  bar.style.left = Math.max(4, Math.min(cr.width - w - 4, br.left - cr.left)) + 'px';
+  const sl = canvas.scrollLeft; // общая сетка на узком экране: холст прокручивается
+  bar.style.left = sl + Math.max(4, Math.min(cr.width - w - 4, br.left - cr.left)) + 'px';
   bar.style.top = top + 'px';
 }
 
@@ -1273,6 +1335,19 @@ canvas.addEventListener('pointerdown', (e) => {
   if (menuOpen()) { closeMenu(); return; } // тап мимо меню — передумал
   const slot = e.target.closest('.slot');
   if (slot) { S.page = +slot.dataset.goto; S.view = 'pages'; S.sel = null; renderAll(); return; }
+  const cw = touchMode() && e.target.closest('.pagewrap.ctx');
+  if (cw) { // приглушённая пара: тап — перейти к ней, взмах — листать
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, t0 = performance.now();
+    const toward = cw.previousElementSibling ? 1 : -1; // пара справа — вперёд
+    const up = (ev) => {
+      window.removeEventListener('pointerup', up);
+      const dx = ev.clientX - sx;
+      flipPage(isFlick(dx, ev.clientY - sy, performance.now() - t0) ? (dx < 0 ? 1 : -1) : toward);
+    };
+    window.addEventListener('pointerup', up);
+    return;
+  }
   const pg = e.target.closest('.page[data-page]');
   if (!pg) {
     const desk = e.target === canvas || e.target.closest('.spread') === null;
@@ -1280,10 +1355,13 @@ canvas.addEventListener('pointerdown', (e) => {
       const sx = e.clientX, sy = e.clientY, t0 = performance.now();
       const up = (ev) => {
         window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        if (ev.type === 'pointercancel') return; // браузер забрал жест под прокрутку листа
         if (isFlick(ev.clientX - sx, ev.clientY - sy, performance.now() - t0) && flipPage(ev.clientX < sx ? 1 : -1)) return;
         S.sel = null; renderAll();
       };
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
       return;
     }
     if (desk) { S.sel = null; renderAll(); }
@@ -1291,10 +1369,10 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const blk = e.target.closest('.blk');
   const si = +pg.dataset.side, pi = +pg.dataset.page;
+  // общая сетка: активной становится та полоса разворота, по которой щёлкнули
+  let p = pi;
+  if (pg.dataset.pair) { const r = pg.getBoundingClientRect(); p = +pg.dataset.pair.split(',')[(e.clientX - r.left) / r.width < 0.5 ? 0 : 1]; }
   if (!blk) {
-    // общая сетка: активной становится та полоса разворота, по которой щёлкнули
-    let p = pi;
-    if (pg.dataset.pair) { const r = pg.getBoundingClientRect(); p = +pg.dataset.pair.split(',')[(e.clientX - r.left) / r.width < 0.5 ? 0 : 1]; }
     if (touchMode()) { e.preventDefault(); return startDraw(e, pg, si, p, !!S.sel); }
     S.sel = null; S.side = si; S.page = p; renderAll(); return;
   }
@@ -1308,7 +1386,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const b = f.block, label = tr(M.BLOCKS[b.type].name);
   const payload = { kind: 'move', id, gx: Math.max(0, Math.min(b.w - 1, cx - b.x)), gy: Math.max(0, Math.min(b.h - 1, cy - b.y)) };
   if (S.sel === id && isImg && !e.target.classList.contains('grip')) return touchMode() ? holdOrPan(e, id, payload, label) : startPan(e, id);
-  if (S.sel !== id) { S.sel = id; S.page = pi; S.side = si; renderAll(); }
+  if (S.sel !== id) { S.sel = id; S.page = p; S.side = si; renderAll(); }
   startDrag(e, payload, label, touchMode() ? 10 : 5);
 });
 
@@ -1661,11 +1739,6 @@ $('#exportBtn').onclick = () => openExport();
 canvas.addEventListener('click', (e) => {
   const tb = e.target.closest('[data-tb]');
   if (tb) return tbAct(tb.dataset.tb);
-  const pr = e.target.closest('[data-peer]');
-  if (pr) {
-    const order = M.spreads(S.doc, S.side).flat(), p = +pr.dataset.peer;
-    return flipTo(p, Math.sign(order.indexOf(p) - order.indexOf(S.page)));
-  }
   const b = e.target.closest('button[data-act]');
   if (b) act(b.dataset.act, b);
 });

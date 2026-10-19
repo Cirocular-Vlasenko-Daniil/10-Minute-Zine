@@ -424,17 +424,16 @@ body.touch .page { touch-action: none; }
   body.m-inspector .fab { display: none; } /* пока открыты свойства, «+» не нужен и мешает панели у блока */
 }
 
-/* соседняя страница разворота — в углу; перелистывание — с лёгким сдвигом */
-.peer {
-  position: absolute; top: 8px; z-index: 5; height: auto; padding: 4px; display: flex; align-items: center; gap: 4px;
-  background: var(--bg); border: 1px solid var(--ink); box-shadow: 3px 3px 0 var(--mute);
-}
-.peer.l { left: 8px; }
-.peer.r { right: 8px; }
-.peer:hover:not(:disabled) { background: var(--bg); color: var(--ink); }
-.peer i { font-style: normal; font-size: 18px; line-height: 1; padding: 0 2px; }
-.peer .thumb { outline-color: var(--ink2); }
-@keyframes inNext { from { transform: translateX(48px); opacity: .25; } to { transform: none; opacity: 1; } }
-@keyframes inPrev { from { transform: translateX(-48px); opacity: .25; } to { transform: none; opacity: 1; } }
+/* узкий экран: пара выбранной страницы рядом, приглушённая; общая сетка — лист прокручивается вбок */
+.pagewrap { transition: opacity .22s; }
+.pagewrap.ctx { opacity: .4; }
+.pagewrap.ctx .plabel { visibility: hidden; }
+#canvas.hscroll { overflow-x: auto; overflow-y: hidden; justify-content: flex-start; scrollbar-width: none; }
+#canvas.hscroll::-webkit-scrollbar { display: none; }
+#canvas.hscroll .spread { margin: 0 24px; flex-shrink: 0; }
+/* --shift — сдвиг ленты, чтобы выбранная страница пары стояла по центру */
+.spread { transform: translateX(var(--shift, 0px)); }
+@keyframes inNext { from { transform: translateX(calc(var(--shift, 0px) + 48px)); opacity: .25; } to { transform: translateX(var(--shift, 0px)); opacity: 1; } }
+@keyframes inPrev { from { transform: translateX(calc(var(--shift, 0px) - 48px)); opacity: .25; } to { transform: translateX(var(--shift, 0px)); opacity: 1; } }
 .spread.in-next { animation: inNext .2s ease-out; }
 .spread.in-prev { animation: inPrev .2s ease-out; }
